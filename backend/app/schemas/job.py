@@ -1,0 +1,83 @@
+from datetime import datetime
+from enum import Enum
+
+from pydantic import BaseModel, Field, HttpUrl, field_validator
+
+from app.schemas.application import ApplicationRead
+
+
+class JobSourceType(str, Enum):
+    manual = "manual"
+    url = "url"
+
+
+class JobBase(BaseModel):
+    company_name: str = Field(min_length=1, max_length=255)
+    job_title: str = Field(min_length=1, max_length=255)
+    location: str = ""
+    job_description: str = Field(min_length=1)
+    source_url: HttpUrl | None = None
+    source_type: JobSourceType = JobSourceType.manual
+
+    @field_validator("company_name", "job_title", "location", "job_description", mode="before")
+    @classmethod
+    def normalize_text(cls, value: object) -> str:
+        if value is None:
+            return ""
+        return str(value).strip()
+
+    @field_validator("source_url", mode="before")
+    @classmethod
+    def normalize_source_url(cls, value: object) -> object:
+        if value is None or str(value).strip() == "":
+            return None
+        return value
+
+
+class JobCreate(JobBase):
+    pass
+
+
+class AnalyzeNewJobRequest(JobCreate):
+    pass
+
+
+class JobUpdate(BaseModel):
+    company_name: str | None = None
+    job_title: str | None = None
+    location: str | None = None
+    job_description: str | None = None
+    source_url: HttpUrl | None = None
+    source_type: JobSourceType | None = None
+
+    @field_validator("company_name", "job_title", "location", "job_description", mode="before")
+    @classmethod
+    def normalize_optional_text(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        return str(value).strip()
+
+    @field_validator("source_url", mode="before")
+    @classmethod
+    def normalize_optional_source_url(cls, value: object) -> object:
+        if value is None or str(value).strip() == "":
+            return None
+        return value
+
+
+class JobRead(JobBase):
+    id: int
+    user_id: int
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class JobWithApplicationRead(JobRead):
+    application: ApplicationRead | None = None
+
+
+class AnalyzeNewJobResponse(BaseModel):
+    job: JobRead
+    application: ApplicationRead
