@@ -277,6 +277,15 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 
 `BACKEND_CORS_ORIGINS` and `CORS_ORIGINS` are both supported for backend CORS configuration.
 
+## Security Notes
+
+- The MVP currently stores JWTs in `localStorage` for development simplicity.
+- For production hardening, migrate auth to `httpOnly`, `Secure`, `SameSite` cookies and add CSRF protection where appropriate.
+- Avoid rendering user-provided HTML. ApplyPilot displays user/job text as plain text.
+- All backend product routes are authenticated and scoped to the current user.
+- `SECRET_KEY`, `ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES`, `DATABASE_URL`, and CORS origins are read from environment variables.
+- Keep real `.env` files out of version control; use `.env.example` as documentation only.
+
 ## API Quick Reference
 
 Auth:

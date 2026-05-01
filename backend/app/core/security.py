@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from jose import JWTError, jwt
+import jwt
+from jwt import InvalidTokenError
 from passlib.context import CryptContext
 
 from app.core.config import settings
@@ -28,5 +29,5 @@ def create_access_token(subject: str, expires_delta: timedelta | None = None) ->
 def decode_access_token(token: str) -> dict[str, Any]:
     try:
         return jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
-    except JWTError as exc:
+    except InvalidTokenError as exc:
         raise ValueError("Invalid access token") from exc

@@ -15,9 +15,9 @@ class JobSourceType(str, Enum):
 class JobBase(BaseModel):
     company_name: str = Field(min_length=1, max_length=255)
     job_title: str = Field(min_length=1, max_length=255)
-    location: str = ""
-    job_description: str = Field(min_length=1)
-    source_url: HttpUrl | None = None
+    location: str = Field(default="", max_length=255)
+    job_description: str = Field(min_length=20, max_length=50000)
+    source_url: HttpUrl | None = Field(default=None, max_length=2000)
     source_type: JobSourceType = JobSourceType.manual
 
     @field_validator("company_name", "job_title", "location", "job_description", mode="before")
@@ -44,11 +44,11 @@ class AnalyzeNewJobRequest(JobCreate):
 
 
 class JobUpdate(BaseModel):
-    company_name: str | None = None
-    job_title: str | None = None
-    location: str | None = None
-    job_description: str | None = None
-    source_url: HttpUrl | None = None
+    company_name: str | None = Field(default=None, min_length=1, max_length=255)
+    job_title: str | None = Field(default=None, min_length=1, max_length=255)
+    location: str | None = Field(default=None, max_length=255)
+    job_description: str | None = Field(default=None, min_length=20, max_length=50000)
+    source_url: HttpUrl | None = Field(default=None, max_length=2000)
     source_type: JobSourceType | None = None
 
     @field_validator("company_name", "job_title", "location", "job_description", mode="before")

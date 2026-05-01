@@ -22,7 +22,6 @@ def to_application_with_job(application: object) -> ApplicationWithJobRead:
         job=ApplicationJobSummary.model_validate(application.job),
         analysis=ApplicationAnalysisSummary.model_validate(analysis) if analysis is not None else None,
     )
-    return payload
 
 
 @router.post("", response_model=ApplicationRead, status_code=status.HTTP_201_CREATED)

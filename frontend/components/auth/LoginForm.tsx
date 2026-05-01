@@ -54,6 +54,8 @@ export function LoginForm() {
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           required
+          minLength={8}
+          maxLength={128}
         />
       </label>
       {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}

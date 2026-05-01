@@ -4,14 +4,14 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class ProfileBase(BaseModel):
-    resume_text: str = ""
-    skills: list[str] = Field(default_factory=list)
-    projects: list[str] = Field(default_factory=list)
-    experience_summary: str = ""
-    target_roles: list[str] = Field(default_factory=list)
-    target_locations: list[str] = Field(default_factory=list)
+    resume_text: str = Field(default="", max_length=30000)
+    skills: list[str] = Field(default_factory=list, max_length=100)
+    projects: list[str] = Field(default_factory=list, max_length=50)
+    experience_summary: str = Field(default="", max_length=5000)
+    target_roles: list[str] = Field(default_factory=list, max_length=30)
+    target_locations: list[str] = Field(default_factory=list, max_length=30)
     graduation_date: date | None = None
-    work_authorization_notes: str = ""
+    work_authorization_notes: str = Field(default="", max_length=2000)
 
     @field_validator("resume_text", "experience_summary", "work_authorization_notes", mode="before")
     @classmethod
@@ -27,18 +27,21 @@ class ProfileBase(BaseModel):
             return []
         if not isinstance(value, list):
             return []
-        return [str(item).strip() for item in value if str(item).strip()]
+        items = [str(item).strip() for item in value if str(item).strip()]
+        if any(len(item) > 300 for item in items):
+            raise ValueError("List items must be 300 characters or fewer.")
+        return items
 
 
 class ProfileUpdate(BaseModel):
-    resume_text: str | None = None
-    skills: list[str] | None = None
-    projects: list[str] | None = None
-    experience_summary: str | None = None
-    target_roles: list[str] | None = None
-    target_locations: list[str] | None = None
+    resume_text: str | None = Field(default=None, max_length=30000)
+    skills: list[str] | None = Field(default=None, max_length=100)
+    projects: list[str] | None = Field(default=None, max_length=50)
+    experience_summary: str | None = Field(default=None, max_length=5000)
+    target_roles: list[str] | None = Field(default=None, max_length=30)
+    target_locations: list[str] | None = Field(default=None, max_length=30)
     graduation_date: date | None = None
-    work_authorization_notes: str | None = None
+    work_authorization_notes: str | None = Field(default=None, max_length=2000)
 
     @field_validator("resume_text", "experience_summary", "work_authorization_notes", mode="before")
     @classmethod
@@ -54,7 +57,10 @@ class ProfileUpdate(BaseModel):
             return []
         if not isinstance(value, list):
             return []
-        return [str(item).strip() for item in value if str(item).strip()]
+        items = [str(item).strip() for item in value if str(item).strip()]
+        if any(len(item) > 300 for item in items):
+            raise ValueError("List items must be 300 characters or fewer.")
+        return items
 
 
 class ProfileRead(ProfileBase):

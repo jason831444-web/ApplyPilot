@@ -27,6 +27,18 @@ export function NewJobForm() {
     }
 
     setError(null);
+    if (companyName.trim().length === 0 || jobTitle.trim().length === 0) {
+      setError("Company name and job title are required.");
+      return;
+    }
+    if (jobDescription.trim().length < 20) {
+      setError("Job description must be at least 20 characters.");
+      return;
+    }
+    if (jobDescription.length > 50000) {
+      setError("Job description must be 50,000 characters or fewer.");
+      return;
+    }
     setIsSubmitting(true);
 
     const sourceType: JobSourceType = sourceUrl.trim() ? "url" : "manual";
@@ -69,6 +81,7 @@ export function NewJobForm() {
               className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-950"
               value={companyName}
               onChange={(event) => setCompanyName(event.target.value)}
+              maxLength={255}
               required
             />
           </label>
@@ -78,6 +91,7 @@ export function NewJobForm() {
               className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-950"
               value={jobTitle}
               onChange={(event) => setJobTitle(event.target.value)}
+              maxLength={255}
               required
             />
           </label>
@@ -85,10 +99,11 @@ export function NewJobForm() {
             <span>Location</span>
             <input
               className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-950"
-              value={location}
-              onChange={(event) => setLocation(event.target.value)}
-              placeholder="New York, NY or Remote"
-            />
+            value={location}
+            onChange={(event) => setLocation(event.target.value)}
+            placeholder="New York, NY or Remote"
+            maxLength={255}
+          />
           </label>
           <label className="block space-y-1 text-sm font-medium text-slate-700">
             <span>Source URL</span>
@@ -98,6 +113,7 @@ export function NewJobForm() {
               value={sourceUrl}
               onChange={(event) => setSourceUrl(event.target.value)}
               placeholder="https://example.com/job"
+              maxLength={2000}
             />
           </label>
         </div>
@@ -109,8 +125,13 @@ export function NewJobForm() {
           value={jobDescription}
           onChange={(event) => setJobDescription(event.target.value)}
           placeholder="Paste the full job description here."
+          minLength={20}
+          maxLength={50000}
           required
         />
+        <span className="block text-xs font-normal text-slate-500">
+          {jobDescription.length.toLocaleString()} / 50,000 characters
+        </span>
       </label>
       </div>
 

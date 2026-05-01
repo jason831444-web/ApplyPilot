@@ -49,6 +49,17 @@ export function ApplicationEditor({ jobId, application, onSaved }: Props) {
     setMessage(null);
     setError(null);
 
+    if (notes.length > 5000) {
+      setError("Notes must be 5,000 characters or fewer.");
+      setIsSaving(false);
+      return;
+    }
+    if (nextAction.length > 500) {
+      setError("Next action must be 500 characters or fewer.");
+      setIsSaving(false);
+      return;
+    }
+
     const body = {
       status,
       applied_date: emptyToNull(appliedDate),
@@ -117,6 +128,7 @@ export function ApplicationEditor({ jobId, application, onSaved }: Props) {
                 value={nextAction}
                 onChange={(event) => setNextAction(event.target.value)}
                 placeholder="Follow up, prep OA, update resume"
+                maxLength={500}
               />
             </label>
             <label className="block space-y-1 text-sm font-medium text-slate-700">
@@ -137,7 +149,11 @@ export function ApplicationEditor({ jobId, application, onSaved }: Props) {
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
               placeholder="Recruiter name, application portal notes, interview prep reminders"
+              maxLength={5000}
             />
+            <span className="block text-xs font-normal text-slate-500">
+              {notes.length.toLocaleString()} / 5,000 characters
+            </span>
           </label>
         </CardBody>
       </Card>

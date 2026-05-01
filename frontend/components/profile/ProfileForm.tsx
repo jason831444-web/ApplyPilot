@@ -115,6 +115,22 @@ export function ProfileForm() {
     setError(null);
     setSuccess(null);
 
+    if (resumeText.length > 30000) {
+      setError("Resume text must be 30,000 characters or fewer.");
+      setIsSaving(false);
+      return;
+    }
+    if (experienceSummary.length > 5000) {
+      setError("Experience summary must be 5,000 characters or fewer.");
+      setIsSaving(false);
+      return;
+    }
+    if (workAuthorizationNotes.length > 2000) {
+      setError("Work authorization notes must be 2,000 characters or fewer.");
+      setIsSaving(false);
+      return;
+    }
+
     try {
       const data = await apiRequest<Profile>("/api/profile/me", {
         method: "PUT",
@@ -151,7 +167,11 @@ export function ProfileForm() {
               value={resumeText}
               onChange={(event) => setResumeText(event.target.value)}
               placeholder="Paste your resume text here."
+              maxLength={30000}
             />
+            <span className="block text-xs font-normal text-slate-500">
+              {resumeText.length.toLocaleString()} / 30,000 characters
+            </span>
           </label>
           <label className="block space-y-1 text-sm font-medium text-slate-700">
             <span>Experience summary</span>
@@ -160,6 +180,7 @@ export function ProfileForm() {
               value={experienceSummary}
               onChange={(event) => setExperienceSummary(event.target.value)}
               placeholder="Summarize internships, research, coursework, and notable experience."
+              maxLength={5000}
             />
           </label>
         </CardBody>
@@ -175,6 +196,7 @@ export function ProfileForm() {
               value={skillsInput}
               onChange={(event) => setSkillsInput(event.target.value)}
               placeholder="Python, React, PostgreSQL"
+              maxLength={5000}
             />
             <span className="block text-xs font-normal text-slate-500">Separate skills with commas.</span>
           </label>
@@ -191,6 +213,7 @@ export function ProfileForm() {
               value={projectsInput}
               onChange={(event) => setProjectsInput(event.target.value)}
               placeholder="One project per line."
+              maxLength={15000}
             />
             <span className="block text-xs font-normal text-slate-500">Use one line per project for the MVP.</span>
           </label>
@@ -207,6 +230,7 @@ export function ProfileForm() {
               value={targetRolesInput}
               onChange={(event) => setTargetRolesInput(event.target.value)}
               placeholder="Software Engineer, Backend Engineer"
+              maxLength={3000}
             />
             <span className="block text-xs font-normal text-slate-500">Separate roles with commas.</span>
           </label>
@@ -217,6 +241,7 @@ export function ProfileForm() {
               value={targetLocationsInput}
               onChange={(event) => setTargetLocationsInput(event.target.value)}
               placeholder="New York, Remote, Seattle"
+              maxLength={3000}
             />
             <span className="block text-xs font-normal text-slate-500">Separate locations with commas.</span>
           </label>
@@ -242,6 +267,7 @@ export function ProfileForm() {
               value={workAuthorizationNotes}
               onChange={(event) => setWorkAuthorizationNotes(event.target.value)}
               placeholder="Example: F-1 OPT eligible, may need H-1B sponsorship later."
+              maxLength={2000}
             />
           </label>
         </CardBody>

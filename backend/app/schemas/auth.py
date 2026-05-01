@@ -3,8 +3,8 @@ from pydantic import BaseModel, EmailStr, Field
 
 class UserCreate(BaseModel):
     email: EmailStr
-    full_name: str = Field(min_length=1, max_length=255)
-    password: str = Field(min_length=8)
+    full_name: str = Field(min_length=1, max_length=120)
+    password: str = Field(min_length=8, max_length=128)
 
     model_config = {"str_strip_whitespace": True}
 
@@ -23,7 +23,7 @@ class RegisterRequest(UserCreate):
 
 class LoginRequest(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(min_length=8, max_length=128)
 
 
 class TokenResponse(BaseModel):

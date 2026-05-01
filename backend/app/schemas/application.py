@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from enum import Enum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.schemas.analysis import AuthorizationRisk, NewGradFitLabel, Recommendation
 
@@ -23,8 +23,8 @@ class ApplicationBase(BaseModel):
     job_id: int
     status: ApplicationStatus = ApplicationStatus.saved
     applied_date: date | None = None
-    notes: str | None = None
-    next_action: str | None = None
+    notes: str | None = Field(default=None, max_length=5000)
+    next_action: str | None = Field(default=None, max_length=500)
     next_action_date: date | None = None
 
 
@@ -35,8 +35,8 @@ class ApplicationCreate(ApplicationBase):
 class ApplicationUpdate(BaseModel):
     status: ApplicationStatus | None = None
     applied_date: date | None = None
-    notes: str | None = None
-    next_action: str | None = None
+    notes: str | None = Field(default=None, max_length=5000)
+    next_action: str | None = Field(default=None, max_length=500)
     next_action_date: date | None = None
 
 

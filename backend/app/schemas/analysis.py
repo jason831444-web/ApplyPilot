@@ -1,7 +1,7 @@
 from enum import Enum
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class NewGradFitLabel(str, Enum):
@@ -38,13 +38,13 @@ class JobAnalysisRead(BaseModel):
     required_skills: list[str]
     preferred_skills: list[str]
     experience_requirements: list[dict]
-    overall_score: int
-    new_grad_fit_score: int
-    resume_match_score: int
-    required_skill_score: int
-    preferred_skill_score: int
-    experience_fit_score: int
-    location_fit_score: int
+    overall_score: int = Field(ge=0, le=100)
+    new_grad_fit_score: int = Field(ge=0, le=100)
+    resume_match_score: int = Field(ge=0, le=100)
+    required_skill_score: int = Field(ge=0, le=100)
+    preferred_skill_score: int = Field(ge=0, le=100)
+    experience_fit_score: int = Field(ge=0, le=100)
+    location_fit_score: int = Field(ge=0, le=100)
     new_grad_fit_label: NewGradFitLabel | None = None
     authorization_risk: AuthorizationRisk
     recommendation: Recommendation | None = None

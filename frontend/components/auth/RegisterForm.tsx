@@ -43,6 +43,7 @@ export function RegisterForm() {
           className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-950"
           value={fullName}
           onChange={(event) => setFullName(event.target.value)}
+          maxLength={120}
           required
         />
       </label>
@@ -65,6 +66,7 @@ export function RegisterForm() {
           onChange={(event) => setPassword(event.target.value)}
           required
           minLength={8}
+          maxLength={128}
         />
       </label>
       {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
