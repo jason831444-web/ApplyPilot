@@ -30,7 +30,7 @@ class JobRepository:
         statement = (
             select(Job)
             .where(Job.user_id == user_id)
-            .options(selectinload(Job.application))
+            .options(selectinload(Job.application), selectinload(Job.analysis))
             .order_by(Job.created_at.desc(), Job.id.desc())
         )
         return list(self.db.scalars(statement).all())
@@ -39,7 +39,7 @@ class JobRepository:
         statement = (
             select(Job)
             .where(Job.id == job_id, Job.user_id == user_id)
-            .options(selectinload(Job.application))
+            .options(selectinload(Job.application), selectinload(Job.analysis))
         )
         return self.db.scalar(statement)
 

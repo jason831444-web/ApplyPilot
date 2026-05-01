@@ -1,7 +1,9 @@
-from datetime import date
+from datetime import date, datetime
 from enum import Enum
 
 from pydantic import BaseModel
+
+from app.schemas.analysis import AuthorizationRisk, NewGradFitLabel, Recommendation
 
 
 class ApplicationStatus(str, Enum):
@@ -41,5 +43,30 @@ class ApplicationUpdate(BaseModel):
 class ApplicationRead(ApplicationBase):
     id: int
     user_id: int
+    created_at: datetime
+    updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class ApplicationJobSummary(BaseModel):
+    id: int
+    company_name: str
+    job_title: str
+    location: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class ApplicationAnalysisSummary(BaseModel):
+    overall_score: int
+    recommendation: Recommendation | None = None
+    authorization_risk: AuthorizationRisk
+    new_grad_fit_label: NewGradFitLabel | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class ApplicationWithJobRead(ApplicationRead):
+    job: ApplicationJobSummary
+    analysis: ApplicationAnalysisSummary | None = None

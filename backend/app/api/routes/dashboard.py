@@ -1,8 +1,12 @@
 from fastapi import APIRouter
 
+from app.api.deps import CurrentUser, DbSession
+from app.schemas.dashboard import DashboardSummary
+from app.services.dashboard_service import DashboardService
+
 router = APIRouter()
 
 
-@router.get("/summary")
-def dashboard_summary_placeholder() -> dict[str, str]:
-    return {"message": "Dashboard business logic is not implemented yet."}
+@router.get("/summary", response_model=DashboardSummary)
+def dashboard_summary(current_user: CurrentUser, db: DbSession) -> DashboardSummary:
+    return DashboardService(db).get_summary(current_user)

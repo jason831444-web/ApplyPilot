@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/Button";
+import { ErrorState } from "@/components/ui/State";
 
 export function RegisterForm() {
   const router = useRouter();
@@ -30,12 +32,12 @@ export function RegisterForm() {
   }
 
   return (
-    <form className="max-w-md space-y-5" onSubmit={handleSubmit}>
+    <form className="mx-auto max-w-md rounded-md border border-slate-200 bg-white p-6 shadow-sm" onSubmit={handleSubmit}>
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold">Register</h1>
-        <p className="text-sm text-slate-600">Create your ApplyPilot account.</p>
+        <h1 className="text-2xl font-semibold tracking-tight">Register</h1>
+        <p className="text-sm text-slate-600">Create your job-fit decision workspace.</p>
       </div>
-      <label className="block space-y-1 text-sm font-medium text-slate-700">
+      <label className="mt-5 block space-y-1 text-sm font-medium text-slate-700">
         <span>Full name</span>
         <input
           className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-950"
@@ -44,7 +46,7 @@ export function RegisterForm() {
           required
         />
       </label>
-      <label className="block space-y-1 text-sm font-medium text-slate-700">
+      <label className="mt-4 block space-y-1 text-sm font-medium text-slate-700">
         <span>Email</span>
         <input
           className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-950"
@@ -54,7 +56,7 @@ export function RegisterForm() {
           required
         />
       </label>
-      <label className="block space-y-1 text-sm font-medium text-slate-700">
+      <label className="mt-4 block space-y-1 text-sm font-medium text-slate-700">
         <span>Password</span>
         <input
           className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-950"
@@ -65,15 +67,11 @@ export function RegisterForm() {
           minLength={8}
         />
       </label>
-      {error ? <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
-      <button
-        className="w-full rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-400"
-        type="submit"
-        disabled={isSubmitting}
-      >
+      {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
+      <Button className="mt-5 w-full" type="submit" disabled={isSubmitting}>
         {isSubmitting ? "Creating account..." : "Create account"}
-      </button>
-      <p className="text-sm text-slate-600">
+      </Button>
+      <p className="mt-4 text-sm text-slate-600">
         Already have an account?{" "}
         <Link className="font-medium text-slate-950 underline" href="/login">
           Login

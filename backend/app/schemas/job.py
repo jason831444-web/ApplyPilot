@@ -3,6 +3,7 @@ from enum import Enum
 
 from pydantic import BaseModel, Field, HttpUrl, field_validator
 
+from app.schemas.analysis import JobAnalysisRead
 from app.schemas.application import ApplicationRead
 
 
@@ -76,8 +77,10 @@ class JobRead(JobBase):
 
 class JobWithApplicationRead(JobRead):
     application: ApplicationRead | None = None
+    analysis: JobAnalysisRead | None = None
 
 
 class AnalyzeNewJobResponse(BaseModel):
     job: JobRead
     application: ApplicationRead
+    analysis: JobAnalysisRead

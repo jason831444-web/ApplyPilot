@@ -1,10 +1,12 @@
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { JobDetailView } from "@/components/jobs/JobDetailView";
 
-export default function JobDetailPage({ params }: { params: { id: string } }) {
+export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+
   return (
     <ProtectedRoute>
-      <JobDetailView jobId={params.id} />
+      <JobDetailView jobId={id} />
     </ProtectedRoute>
   );
 }

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Response, status
 
 from app.api.deps import CurrentUser, DbSession
+from app.schemas.analysis import JobAnalysisRead
 from app.schemas.application import ApplicationRead
 from app.schemas.job import (
     AnalyzeNewJobRequest,
@@ -27,8 +28,12 @@ def analyze_new_job(
     current_user: CurrentUser,
     db: DbSession,
 ) -> AnalyzeNewJobResponse:
-    job, application = JobService(db).create_and_prepare_analysis(user=current_user, payload=payload)
-    return AnalyzeNewJobResponse(job=JobRead.model_validate(job), application=ApplicationRead.model_validate(application))
+    job, application, analysis = JobService(db).create_and_prepare_analysis(user=current_user, payload=payload)
+    return AnalyzeNewJobResponse(
+        job=JobRead.model_validate(job),
+        application=ApplicationRead.model_validate(application),
+        analysis=JobAnalysisRead.model_validate(analysis),
+    )
 
 
 @router.get("", response_model=list[JobWithApplicationRead])
@@ -60,11 +65,13 @@ def delete_job(job_id: int, current_user: CurrentUser, db: DbSession) -> Respons
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.post("/{job_id}/analyze")
-def analyze_job_placeholder(job_id: int) -> dict[str, str | int]:
-    return {"job_id": job_id, "message": "Job analysis business logic is not implemented yet."}
+@router.post("/{job_id}/analyze", response_model=JobAnalysisRead)
+def analyze_job(job_id: int, current_user: CurrentUser, db: DbSession) -> JobAnalysisRead:
+    analysis = JobService(db).analyze_for_user(user=current_user, job_id=job_id)
+    return JobAnalysisRead.model_validate(analysis)
 
 
-@router.get("/{job_id}/analysis")
-def read_job_analysis_placeholder(job_id: int) -> dict[str, str | int]:
-    return {"job_id": job_id, "message": "Analysis read business logic is not implemented yet."}
+@router.get("/{job_id}/analysis", response_model=JobAnalysisRead)
+def read_job_analysis(job_id: int, current_user: CurrentUser, db: DbSession) -> JobAnalysisRead:
+    analysis = JobService(db).get_analysis_for_user(user=current_user, job_id=job_id)
+    return JobAnalysisRead.model_validate(analysis)

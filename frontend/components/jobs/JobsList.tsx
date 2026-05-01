@@ -4,7 +4,13 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/api";
+import { formatTitle } from "@/lib/format";
 import type { Job } from "@/lib/types";
+import { ButtonLink } from "@/components/ui/Button";
+import { ScoreBadge } from "@/components/ui/Badge";
+import { EmptyState, ErrorState, LoadingState } from "@/components/ui/State";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { RecommendationBadge } from "./RecommendationBadge";
 
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(new Date(value));
@@ -50,35 +56,36 @@ export function JobsList() {
   }, [token]);
 
   if (isLoading) {
-    return <p className="text-sm text-slate-600">Loading jobs...</p>;
+    return <LoadingState label="Loading jobs..." />;
   }
 
   return (
     <section className="space-y-5">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">Jobs</h1>
-          <p className="text-sm text-slate-600">Saved postings ready for analysis and tracking.</p>
-        </div>
-        <Link className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white" href="/jobs/new">
-          New Job
-        </Link>
-      </div>
+      <PageHeader
+        title="Jobs"
+        description="Saved postings with decision-engine recommendations and application status."
+        action={<ButtonLink href="/jobs/new">Add Job</ButtonLink>}
+      />
 
-      {error ? <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
+      {error ? <ErrorState message={error} /> : null}
 
       {jobs.length === 0 ? (
-        <div className="rounded-md border border-dashed border-slate-300 bg-white px-4 py-8">
-          <p className="text-sm text-slate-600">No jobs yet. Paste a job description to start your decision workflow.</p>
-        </div>
+        <EmptyState
+          title="No jobs yet"
+          description="Paste a job description to start your decision workflow."
+          actionHref="/jobs/new"
+          actionLabel="Analyze Job"
+        />
       ) : (
-        <div className="overflow-hidden rounded-md border border-slate-200 bg-white">
-          <table className="w-full border-collapse text-left text-sm">
+        <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
+          <table className="w-full min-w-[880px] border-collapse text-left text-sm">
             <thead className="bg-slate-50 text-slate-600">
               <tr>
                 <th className="px-4 py-3 font-medium">Company</th>
                 <th className="px-4 py-3 font-medium">Title</th>
                 <th className="px-4 py-3 font-medium">Location</th>
+                <th className="px-4 py-3 font-medium">Decision</th>
+                <th className="px-4 py-3 font-medium">Score</th>
                 <th className="px-4 py-3 font-medium">Created</th>
                 <th className="px-4 py-3 font-medium">Source</th>
               </tr>
@@ -93,8 +100,19 @@ export function JobsList() {
                     <Link href={`/jobs/${job.id}`}>{job.job_title}</Link>
                   </td>
                   <td className="px-4 py-3 text-slate-600">{job.location || "Not specified"}</td>
+                  <td className="px-4 py-3">
+                    {job.analysis ? (
+                      <div className="flex flex-wrap gap-2">
+                        <RecommendationBadge type="recommendation" value={job.analysis.recommendation} />
+                        <RecommendationBadge type="risk" value={job.analysis.authorization_risk} />
+                      </div>
+                    ) : (
+                      <span className="text-slate-500">Not analyzed</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3"><ScoreBadge score={job.analysis?.overall_score} /></td>
                   <td className="px-4 py-3 text-slate-600">{formatDate(job.created_at)}</td>
-                  <td className="px-4 py-3 text-slate-600">{job.source_type}</td>
+                  <td className="px-4 py-3 text-slate-600">{formatTitle(job.source_type)}</td>
                 </tr>
               ))}
             </tbody>

@@ -5,6 +5,9 @@ import { FormEvent, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/api";
 import type { AnalyzeNewJobResponse, JobSourceType } from "@/lib/types";
+import { Button } from "@/components/ui/Button";
+import { ErrorState } from "@/components/ui/State";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 export function NewJobForm() {
   const router = useRouter();
@@ -51,56 +54,55 @@ export function NewJobForm() {
 
   return (
     <form className="max-w-4xl space-y-6" onSubmit={handleSubmit}>
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold">Analyze New Job</h1>
-        <p className="max-w-2xl text-sm text-slate-600">
-          Paste a job description now. ApplyPilot will save it and prepare it for the decision engine.
-        </p>
-      </div>
+      <PageHeader
+        title="Analyze New Job"
+        description="Paste a job description. ApplyPilot will save it, compare it against your profile, and generate a recommendation."
+      />
 
-      {error ? <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
+      {error ? <ErrorState message={error} /> : null}
 
-      <div className="grid gap-5 md:grid-cols-2">
-        <label className="block space-y-1 text-sm font-medium text-slate-700">
-          <span>Company name</span>
-          <input
-            className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-950"
-            value={companyName}
-            onChange={(event) => setCompanyName(event.target.value)}
-            required
-          />
-        </label>
-        <label className="block space-y-1 text-sm font-medium text-slate-700">
-          <span>Job title</span>
-          <input
-            className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-950"
-            value={jobTitle}
-            onChange={(event) => setJobTitle(event.target.value)}
-            required
-          />
-        </label>
-        <label className="block space-y-1 text-sm font-medium text-slate-700">
-          <span>Location</span>
-          <input
-            className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-950"
-            value={location}
-            onChange={(event) => setLocation(event.target.value)}
-            placeholder="New York, NY or Remote"
-          />
-        </label>
-        <label className="block space-y-1 text-sm font-medium text-slate-700">
-          <span>Source URL</span>
-          <input
-            className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-950"
-            type="url"
-            value={sourceUrl}
-            onChange={(event) => setSourceUrl(event.target.value)}
-            placeholder="https://example.com/job"
-          />
-        </label>
-      </div>
+      <div className="rounded-md border border-slate-200 bg-white p-5">
+        <div className="grid gap-5 md:grid-cols-2">
+          <label className="block space-y-1 text-sm font-medium text-slate-700">
+            <span>Company name</span>
+            <input
+              className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-950"
+              value={companyName}
+              onChange={(event) => setCompanyName(event.target.value)}
+              required
+            />
+          </label>
+          <label className="block space-y-1 text-sm font-medium text-slate-700">
+            <span>Job title</span>
+            <input
+              className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-950"
+              value={jobTitle}
+              onChange={(event) => setJobTitle(event.target.value)}
+              required
+            />
+          </label>
+          <label className="block space-y-1 text-sm font-medium text-slate-700">
+            <span>Location</span>
+            <input
+              className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-950"
+              value={location}
+              onChange={(event) => setLocation(event.target.value)}
+              placeholder="New York, NY or Remote"
+            />
+          </label>
+          <label className="block space-y-1 text-sm font-medium text-slate-700">
+            <span>Source URL</span>
+            <input
+              className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-950"
+              type="url"
+              value={sourceUrl}
+              onChange={(event) => setSourceUrl(event.target.value)}
+              placeholder="https://example.com/job"
+            />
+          </label>
+        </div>
 
-      <label className="block space-y-1 text-sm font-medium text-slate-700">
+      <label className="mt-5 block space-y-1 text-sm font-medium text-slate-700">
         <span>Job description</span>
         <textarea
           className="min-h-80 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-950"
@@ -110,14 +112,11 @@ export function NewJobForm() {
           required
         />
       </label>
+      </div>
 
-      <button
-        className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-400"
-        type="submit"
-        disabled={isSubmitting}
-      >
-        {isSubmitting ? "Saving..." : "Analyze Job"}
-      </button>
+      <Button type="submit" disabled={isSubmitting}>
+        {isSubmitting ? "Analyzing..." : "Analyze Job"}
+      </Button>
     </form>
   );
 }

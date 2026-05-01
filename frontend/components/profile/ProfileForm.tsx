@@ -4,6 +4,10 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/api";
 import type { Profile, ProfileUpdate } from "@/lib/types";
+import { Button } from "@/components/ui/Button";
+import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { ErrorState, LoadingState } from "@/components/ui/State";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 function parseCommaList(value: string): string[] {
   return value
@@ -127,113 +131,126 @@ export function ProfileForm() {
   }
 
   if (isLoading) {
-    return <p className="text-sm text-slate-600">Loading profile...</p>;
+    return <LoadingState label="Loading profile..." />;
   }
 
   return (
-    <form className="max-w-4xl space-y-6" onSubmit={handleSubmit}>
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold">Profile</h1>
-        <p className="max-w-3xl text-sm text-slate-600">{helperText}</p>
-      </div>
+    <form className="max-w-5xl space-y-6" onSubmit={handleSubmit}>
+      <PageHeader title="Profile" description={helperText} />
 
-      {error ? <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
+      {error ? <ErrorState message={error} /> : null}
       {success ? <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">{success}</p> : null}
 
-      <label className="block space-y-1 text-sm font-medium text-slate-700">
-        <span>Resume text</span>
-        <textarea
-          className="min-h-56 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-950"
-          value={resumeText}
-          onChange={(event) => setResumeText(event.target.value)}
-          placeholder="Paste your resume text here."
-        />
-      </label>
+      <Card>
+        <CardHeader title="Resume" description="Paste the text you want ApplyPilot to compare against job requirements." />
+        <CardBody className="space-y-4">
+          <label className="block space-y-1 text-sm font-medium text-slate-700">
+            <span>Resume text</span>
+            <textarea
+              className="min-h-56 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-950"
+              value={resumeText}
+              onChange={(event) => setResumeText(event.target.value)}
+              placeholder="Paste your resume text here."
+            />
+          </label>
+          <label className="block space-y-1 text-sm font-medium text-slate-700">
+            <span>Experience summary</span>
+            <textarea
+              className="min-h-28 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-950"
+              value={experienceSummary}
+              onChange={(event) => setExperienceSummary(event.target.value)}
+              placeholder="Summarize internships, research, coursework, and notable experience."
+            />
+          </label>
+        </CardBody>
+      </Card>
 
-      <div className="grid gap-5 md:grid-cols-2">
-        <label className="block space-y-1 text-sm font-medium text-slate-700">
-          <span>Skills</span>
-          <input
-            className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-950"
-            value={skillsInput}
-            onChange={(event) => setSkillsInput(event.target.value)}
-            placeholder="Python, React, PostgreSQL"
-          />
-          <span className="block text-xs font-normal text-slate-500">Separate skills with commas.</span>
-        </label>
+      <Card>
+        <CardHeader title="Skills" description="Comma-separated skills are used for required and preferred skill matching." />
+        <CardBody>
+          <label className="block space-y-1 text-sm font-medium text-slate-700">
+            <span>Skills</span>
+            <input
+              className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-950"
+              value={skillsInput}
+              onChange={(event) => setSkillsInput(event.target.value)}
+              placeholder="Python, React, PostgreSQL"
+            />
+            <span className="block text-xs font-normal text-slate-500">Separate skills with commas.</span>
+          </label>
+        </CardBody>
+      </Card>
 
-        <label className="block space-y-1 text-sm font-medium text-slate-700">
-          <span>Target roles</span>
-          <input
-            className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-950"
-            value={targetRolesInput}
-            onChange={(event) => setTargetRolesInput(event.target.value)}
-            placeholder="Software Engineer, Backend Engineer"
-          />
-          <span className="block text-xs font-normal text-slate-500">Separate roles with commas.</span>
-        </label>
+      <Card>
+        <CardHeader title="Projects" description="Projects give the matcher additional evidence beyond your skills list." />
+        <CardBody>
+          <label className="block space-y-1 text-sm font-medium text-slate-700">
+            <span>Projects</span>
+            <textarea
+              className="min-h-32 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-950"
+              value={projectsInput}
+              onChange={(event) => setProjectsInput(event.target.value)}
+              placeholder="One project per line."
+            />
+            <span className="block text-xs font-normal text-slate-500">Use one line per project for the MVP.</span>
+          </label>
+        </CardBody>
+      </Card>
 
-        <label className="block space-y-1 text-sm font-medium text-slate-700">
-          <span>Target locations</span>
-          <input
-            className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-950"
-            value={targetLocationsInput}
-            onChange={(event) => setTargetLocationsInput(event.target.value)}
-            placeholder="New York, Remote, Seattle"
-          />
-          <span className="block text-xs font-normal text-slate-500">Separate locations with commas.</span>
-        </label>
+      <Card>
+        <CardHeader title="Target Roles And Locations" description="These fields power location fit and role relevance signals." />
+        <CardBody className="grid gap-5 md:grid-cols-3">
+          <label className="block space-y-1 text-sm font-medium text-slate-700">
+            <span>Target roles</span>
+            <input
+              className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-950"
+              value={targetRolesInput}
+              onChange={(event) => setTargetRolesInput(event.target.value)}
+              placeholder="Software Engineer, Backend Engineer"
+            />
+            <span className="block text-xs font-normal text-slate-500">Separate roles with commas.</span>
+          </label>
+          <label className="block space-y-1 text-sm font-medium text-slate-700">
+            <span>Target locations</span>
+            <input
+              className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-950"
+              value={targetLocationsInput}
+              onChange={(event) => setTargetLocationsInput(event.target.value)}
+              placeholder="New York, Remote, Seattle"
+            />
+            <span className="block text-xs font-normal text-slate-500">Separate locations with commas.</span>
+          </label>
+          <label className="block space-y-1 text-sm font-medium text-slate-700">
+            <span>Graduation date</span>
+            <input
+              className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-950"
+              type="date"
+              value={graduationDate}
+              onChange={(event) => setGraduationDate(event.target.value)}
+            />
+          </label>
+        </CardBody>
+      </Card>
 
-        <label className="block space-y-1 text-sm font-medium text-slate-700">
-          <span>Graduation date</span>
-          <input
-            className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-950"
-            type="date"
-            value={graduationDate}
-            onChange={(event) => setGraduationDate(event.target.value)}
-          />
-        </label>
-      </div>
-
-      <label className="block space-y-1 text-sm font-medium text-slate-700">
-        <span>Projects</span>
-        <textarea
-          className="min-h-32 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-950"
-          value={projectsInput}
-          onChange={(event) => setProjectsInput(event.target.value)}
-          placeholder="One project per line."
-        />
-        <span className="block text-xs font-normal text-slate-500">Use one line per project for the MVP.</span>
-      </label>
-
-      <label className="block space-y-1 text-sm font-medium text-slate-700">
-        <span>Experience summary</span>
-        <textarea
-          className="min-h-28 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-950"
-          value={experienceSummary}
-          onChange={(event) => setExperienceSummary(event.target.value)}
-          placeholder="Summarize internships, research, coursework, and notable experience."
-        />
-      </label>
-
-      <label className="block space-y-1 text-sm font-medium text-slate-700">
-        <span>Work authorization notes</span>
-        <textarea
-          className="min-h-28 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-950"
-          value={workAuthorizationNotes}
-          onChange={(event) => setWorkAuthorizationNotes(event.target.value)}
-          placeholder="Example: F-1 OPT eligible, may need H-1B sponsorship later."
-        />
-      </label>
+      <Card>
+        <CardHeader title="Work Authorization" description="Used only to flag sponsorship or authorization risk from job postings." />
+        <CardBody>
+          <label className="block space-y-1 text-sm font-medium text-slate-700">
+            <span>Work authorization notes</span>
+            <textarea
+              className="min-h-28 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-950"
+              value={workAuthorizationNotes}
+              onChange={(event) => setWorkAuthorizationNotes(event.target.value)}
+              placeholder="Example: F-1 OPT eligible, may need H-1B sponsorship later."
+            />
+          </label>
+        </CardBody>
+      </Card>
 
       <div className="flex items-center gap-3">
-        <button
-          className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-400"
-          type="submit"
-          disabled={isSaving}
-        >
+        <Button type="submit" disabled={isSaving}>
           {isSaving ? "Saving..." : "Save Profile"}
-        </button>
+        </Button>
         {profile ? <span className="text-xs text-slate-500">Profile ID {profile.id}</span> : null}
       </div>
     </form>

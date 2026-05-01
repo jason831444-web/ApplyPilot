@@ -2,20 +2,36 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { ApplicationEditor } from "@/components/applications/ApplicationEditor";
+import { Button } from "@/components/ui/Button";
+import { ErrorState, LoadingState } from "@/components/ui/State";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/api";
 import { formatTitle } from "@/lib/format";
-import type { Job } from "@/lib/types";
+import type { Application, Job, JobAnalysis } from "@/lib/types";
+import { JobAnalysisView } from "./JobAnalysisView";
 
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
+function getReadableError(err: unknown, fallback = "Something went wrong."): string {
+  return err instanceof Error && err.message ? err.message : fallback;
+}
+
+function isNotFoundMessage(message: string): boolean {
+  return message.toLowerCase().includes("not found");
+}
+
 export function JobDetailView({ jobId }: { jobId: string }) {
   const { token } = useAuth();
   const [job, setJob] = useState<Job | null>(null);
+  const [application, setApplication] = useState<Application | null>(null);
+  const [analysis, setAnalysis] = useState<JobAnalysis | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) {
@@ -31,10 +47,25 @@ export function JobDetailView({ jobId }: { jobId: string }) {
         const data = await apiRequest<Job>(`/api/jobs/${jobId}`, { token });
         if (isMounted) {
           setJob(data);
+          setApplication(data.application ?? null);
+          setAnalysis(data.analysis ?? null);
+        }
+        try {
+          const analysisData = await apiRequest<JobAnalysis>(`/api/jobs/${jobId}/analysis`, { token });
+          if (isMounted) {
+            setAnalysis(analysisData);
+            setAnalysisError(null);
+          }
+        } catch (err) {
+          if (isMounted) {
+            const message = getReadableError(err, "Something went wrong.");
+            setAnalysisError(isNotFoundMessage(message) ? null : message);
+          }
         }
       } catch (err) {
         if (isMounted) {
-          setError(err instanceof Error ? err.message : "Unable to load job.");
+          const message = getReadableError(err, "Something went wrong.");
+          setError(isNotFoundMessage(message) ? "Job not found or you do not have access to this job." : message);
         }
       } finally {
         if (isMounted) {
@@ -50,29 +81,58 @@ export function JobDetailView({ jobId }: { jobId: string }) {
     };
   }, [jobId, token]);
 
+  async function handleAnalyze() {
+    if (!token) {
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setAnalysisError(null);
+
+    try {
+      const data = await apiRequest<JobAnalysis>(`/api/jobs/${jobId}/analyze`, {
+        method: "POST",
+        token,
+      });
+      setAnalysis(data);
+    } catch (err) {
+      setAnalysisError(getReadableError(err, "Something went wrong."));
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }
+
   if (isLoading) {
-    return <p className="text-sm text-slate-600">Loading job...</p>;
+    return <LoadingState label="Loading job..." />;
   }
 
   if (error) {
-    return <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>;
+    return <ErrorState message={error} />;
   }
 
   if (!job) {
-    return <p className="text-sm text-slate-600">Job not found.</p>;
+    return <ErrorState message="Job not found or you do not have access to this job." />;
   }
 
   return (
     <section className="space-y-6">
-      <div className="space-y-2">
+      <div className="space-y-3">
         <Link className="text-sm font-medium text-slate-600 underline" href="/jobs">
           Back to jobs
         </Link>
-        <div>
-          <h1 className="text-2xl font-semibold">{job.job_title}</h1>
-          <p className="text-slate-600">
-            {job.company_name} {job.location ? `- ${job.location}` : ""}
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold">{job.job_title}</h1>
+            <p className="text-slate-600">
+              {job.company_name} {job.location ? `- ${job.location}` : ""}
+            </p>
+          </div>
+          {analysis ? (
+            <div className="rounded-md border border-slate-200 bg-white px-4 py-3 text-right">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Overall score</p>
+              <p className="text-2xl font-semibold text-slate-950">{analysis.overall_score}</p>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -88,7 +148,7 @@ export function JobDetailView({ jobId }: { jobId: string }) {
         <div className="rounded-md border border-slate-200 bg-white p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Application status</p>
           <p className="mt-1 text-sm text-slate-900">
-            {job.application ? formatTitle(job.application.status) : "No application record"}
+            {application ? formatTitle(application.status) : "No application record"}
           </p>
         </div>
       </div>
@@ -102,10 +162,29 @@ export function JobDetailView({ jobId }: { jobId: string }) {
         </p>
       ) : null}
 
-      <div className="rounded-md border border-slate-200 bg-white p-5">
-        <h2 className="text-lg font-semibold">Analysis</h2>
-        <p className="mt-2 text-sm text-slate-600">Analysis will appear here after the decision engine is implemented.</p>
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold">Analysis</h2>
+          <Button variant="secondary" type="button" onClick={handleAnalyze} disabled={isAnalyzing}>
+            {isAnalyzing ? "Analyzing..." : "Re-run Analysis"}
+          </Button>
+        </div>
+
+        {analysisError ? <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">{analysisError}</p> : null}
+        {analysis ? (
+          <JobAnalysisView analysis={analysis} />
+        ) : (
+          <div className="rounded-md border border-slate-200 bg-white p-5">
+            <p className="text-sm text-slate-600">No analysis exists yet. Run analysis to generate job-fit results.</p>
+          </div>
+        )}
       </div>
+
+      <ApplicationEditor
+        jobId={job.id}
+        application={application}
+        onSaved={(savedApplication) => setApplication(savedApplication)}
+      />
 
       <div className="rounded-md border border-slate-200 bg-white p-5">
         <h2 className="text-lg font-semibold">Job Description</h2>
