@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api";
 
 type RequestOptions = Omit<RequestInit, "body"> & {
   body?: unknown;
@@ -53,7 +53,7 @@ function isJsonResponse(response: Response): boolean {
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(`${normalizeApiBaseUrl(API_BASE_URL)}${normalizeApiPath(path)}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -75,6 +75,18 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   }
 
   return response.json() as Promise<T>;
+}
+
+function normalizeApiBaseUrl(value: string): string {
+  return value.replace(/\/+$/, "");
+}
+
+function normalizeApiPath(path: string): string {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  if (normalizeApiBaseUrl(API_BASE_URL).endsWith("/api") && normalizedPath.startsWith("/api/")) {
+    return normalizedPath.slice(4);
+  }
+  return normalizedPath;
 }
 
 export { API_BASE_URL };

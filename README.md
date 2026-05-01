@@ -262,20 +262,20 @@ Root/backend:
 ```bash
 APP_ENV=development
 DATABASE_URL=postgresql+psycopg://applypilot:applypilot@localhost:5432/applypilot
-SECRET_KEY=change-me-in-development
+SECRET_KEY=replace-with-a-long-random-secret
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=60
-BACKEND_CORS_ORIGINS=["http://localhost:3000","http://127.0.0.1:3000"]
-CORS_ORIGINS=["http://localhost:3000","http://127.0.0.1:3000"]
+BACKEND_CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 ```
 
 Frontend:
 
 ```bash
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api
 ```
 
-`BACKEND_CORS_ORIGINS` and `CORS_ORIGINS` are both supported for backend CORS configuration.
+`BACKEND_CORS_ORIGINS` and `CORS_ORIGINS` are both supported for backend CORS configuration. They may be JSON arrays or comma-separated strings.
 
 ## Security Notes
 
@@ -366,48 +366,113 @@ curl -X PATCH http://localhost:8000/api/applications/1 \
 
 ## Deployment Guide
 
-Frontend:
+Target deployment:
 
-- Deploy `frontend` to Vercel.
-- Set `NEXT_PUBLIC_API_BASE_URL` to the deployed backend URL.
-- Vercel build command: `npm run build`.
+- Database: Neon PostgreSQL
+- Backend: Render Web Service
+- Frontend: Vercel
 
-Backend:
+### Neon PostgreSQL
 
-- Deploy `backend` to Render or Railway.
-- Install dependencies from `requirements.txt`.
-- Start command:
+1. Create a Neon project.
+2. Copy the pooled or direct PostgreSQL connection string.
+3. Use a SQLAlchemy-compatible PostgreSQL URL in Render's `DATABASE_URL`.
+4. If Neon includes `sslmode=require`, keep it in the connection string.
+5. Run Alembic migrations through the Render start command or Render Shell.
 
-```bash
-uvicorn app.main:app --host 0.0.0.0 --port $PORT
-```
-
-Database:
-
-- Use Render PostgreSQL, Railway PostgreSQL, or Neon.
-- Set `DATABASE_URL` in the backend environment.
-- Run migrations after deploy:
+Example Neon URL shape:
 
 ```bash
-alembic upgrade head
+postgresql+psycopg://USER:PASSWORD@HOST.neon.tech/DBNAME?sslmode=require
 ```
 
-Backend deployment environment variables:
+### Render Backend Settings
+
+Create a Render Web Service:
+
+- Root Directory: `backend`
+- Runtime: `Python`
+- Build Command: `pip install -r requirements.txt`
+- Start Command: `alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+
+Alternatively, use the included helper:
+
+```bash
+./render-start.sh
+```
+
+Render environment variables:
 
 ```bash
 APP_ENV=production
-DATABASE_URL=...
-SECRET_KEY=...
+DATABASE_URL=<Neon PostgreSQL connection string>
+SECRET_KEY=<generate a long random secret>
 ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=60
-CORS_ORIGINS=["https://your-frontend.vercel.app"]
+ACCESS_TOKEN_EXPIRE_MINUTES=1440
+CORS_ORIGINS=http://localhost:3000,https://<your-vercel-app>.vercel.app
 ```
 
-Optional demo seed after deployment:
+After the first successful backend deploy, seed demo data from Render Shell:
 
 ```bash
 python -m app.seed
 ```
+
+You can also run the seed command locally against the production `DATABASE_URL`, but only if you intentionally want to seed production.
+
+### Vercel Frontend Settings
+
+Create a Vercel project:
+
+- Root Directory: `frontend`
+- Framework Preset: `Next.js`
+- Build Command: `npm run build`
+
+Vercel environment variable:
+
+```bash
+NEXT_PUBLIC_API_BASE_URL=https://<your-render-backend>.onrender.com/api
+```
+
+After Vercel deploys, update Render:
+
+```bash
+CORS_ORIGINS=http://localhost:3000,https://<your-vercel-app>.vercel.app
+```
+
+Then redeploy the Render backend.
+
+### Production Smoke Tests
+
+Backend health:
+
+```bash
+curl https://<your-render-backend>.onrender.com/health
+```
+
+Demo login:
+
+```bash
+curl -X POST https://<your-render-backend>.onrender.com/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"demo@applypilot.dev","password":"password123"}'
+```
+
+Dashboard:
+
+```bash
+curl https://<your-render-backend>.onrender.com/api/dashboard/summary \
+  -H "Authorization: Bearer <TOKEN>"
+```
+
+Frontend:
+
+- Open `https://<your-vercel-app>.vercel.app`
+- Login with `demo@applypilot.dev` / `password123`
+- Verify `/dashboard` loads seeded data
+- Verify `/jobs` loads demo jobs
+- Verify `/applications` loads the application pipeline
+- Verify `/jobs/new` can analyze a new pasted job
 
 ## Testing Commands
 
