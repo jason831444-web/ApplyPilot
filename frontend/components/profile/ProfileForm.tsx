@@ -169,10 +169,18 @@ export function ProfileForm() {
         return;
       }
       setResumeText(result.resume_text);
-      setSkillsInput(joinCommaList(result.skills_suggestions));
-      setProjectsInput(joinLineList(result.projects_suggestions));
-      setExperienceSummary(result.experience_summary_suggestion);
-      setSuccess("Resume imported. Review the suggestions, then save your profile.");
+      if (result.skills_suggestions.length > 0) {
+        setSkillsInput(joinCommaList(result.skills_suggestions));
+      }
+      if (result.projects_suggestions.length > 0) {
+        setProjectsInput(joinLineList(result.projects_suggestions));
+      }
+      if (result.experience_summary_suggestion) {
+        setExperienceSummary(result.experience_summary_suggestion);
+      }
+      setSuccess(
+        `Imported ${result.skills_suggestions.length} skills and ${result.projects_suggestions.length} projects from your resume. Review the suggestions, then save your profile.`,
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to import resume.");
     } finally {

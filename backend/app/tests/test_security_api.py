@@ -422,5 +422,58 @@ def test_resume_upload_extracts_pdf_text_and_suggestions() -> None:
     data = response.json()
     assert "Built ApplyPilot" in data["resume_text"]
     assert {"Python", "React", "FastAPI", "PostgreSQL", "Docker"} <= set(data["skills_suggestions"])
-    assert any("Built ApplyPilot" in project for project in data["projects_suggestions"])
+    assert "ApplyPilot" in data["projects_suggestions"]
     assert data["experience_summary_suggestion"]
+
+
+def test_resume_import_section_parser_extracts_clean_projects_and_technical_skills() -> None:
+    from app.services.resume_import_service import (
+        build_experience_summary,
+        extract_project_names,
+        extract_skills_from_technical_skills_section,
+        normalize_resume_text,
+    )
+
+    resume_text = """
+    Jae Yoon
+    jae@example.com | github.com/example | linkedin.com/in/example
+
+    E DUCATION
+    Rutgers University, B.S. Computer Science
+    Coursework: Data Structures, Algorithms
+
+    WORK EXPERIENCE & PROJECTS
+    Teaching Assistant | Rutgers University
+    - Helped students debug Java and Python assignments
+
+    PROJECTS
+    DocuParse – AI-Powered Document Understanding System | FastAPI, Next.js, PostgreSQL, Docker
+    - Built document parsing workflows.
+    Smart Seat & Facility Congestion Analysis System | Python, Computer Vision
+    - Implemented congestion analysis.
+    ApplyPilot – Rule-Based Job-Fit Evaluation Platform | FastAPI, React, PostgreSQL
+    Student Academic Management System (SAM) | Spring Boot, MySQL
+    CNN vs. SNN Image Classification Comparison | Python, Machine Learning
+
+    TECHNICAL SKILLS
+    Technical Languages: C, Java, Python, HTML, CSS, JavaScript, SQL
+    Frameworks: React, Next.js, Node.js, Express.js, Spring Boot, FastAPI, REST API
+    Databases: MySQL, PostgreSQL
+    Tools: Git, GitHub, Docker, Linux, Visual Studio Code, Microsoft Excel
+    Languages: Korean, English
+    """
+
+    normalized = normalize_resume_text(resume_text)
+    skills = extract_skills_from_technical_skills_section(normalized)
+    projects = extract_project_names(normalized)
+    summary = build_experience_summary(normalized, skills, projects)
+
+    assert len(summary) <= 600
+    assert any(project.startswith("DocuParse") for project in projects)
+    assert any(project.startswith("Smart Seat") for project in projects)
+    assert any(project.startswith("ApplyPilot") for project in projects)
+    assert not any("jae@example.com" in project.lower() for project in projects)
+    assert not any("Rutgers University" in project for project in projects)
+    assert {"React", "Next.js", "FastAPI", "PostgreSQL", "Docker"} <= set(skills)
+    assert "Korean" not in skills
+    assert "English" not in skills
