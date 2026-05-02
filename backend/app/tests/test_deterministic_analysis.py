@@ -181,3 +181,28 @@ def test_asha_evidence_sentence_excerpts_are_not_mid_word_fragments() -> None:
     assert not production_ready.startswith("er confident")
     assert all(len(snippet) <= 300 for snippet in snippets)
     assert all(not snippet[0].islower() for snippet in snippets)
+
+
+def test_sparse_technical_startup_posting_caps_match_scores() -> None:
+    description = (
+        "Asha Health is hiring a backend/AI engineer to build AI agents for healthcare workflows. "
+        "But we're still small enough that we're looking for all rounders that take a high degree of ownership. "
+        "The role is in person 5 days a week, most of the team works 6 days a week. "
+        "If you are not super confident in your engineering & product skills, for example if we asked you "
+        "to build a production-ready version of Instagram in 2 days and that sounds difficult, hit that X button. "
+        "Early stage startup experience is important."
+    )
+
+    result = DeterministicRuleBasedProvider().analyze(profile=make_profile(), job=make_job(description))
+
+    assert result.required_skills == ["Backend"]
+    assert result.required_skill_score < 100
+    assert result.required_skill_score <= 70
+    assert result.resume_match_score < 100
+    assert result.resume_match_score <= 65
+    assert result.overall_score < 60
+    assert result.new_grad_fit_label == "weak_fit"
+    assert result.authorization_risk == "unknown"
+    assert "Strong coverage of required skills." not in result.strengths
+    assert any("limited technical skill evidence" in concern for concern in result.concerns)
+    assert any("unstructured" in concern for concern in result.concerns)

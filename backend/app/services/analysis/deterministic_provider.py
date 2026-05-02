@@ -12,6 +12,8 @@ from app.services.analysis.extraction import (
 )
 from app.services.analysis.provider import JobAnalysisResult
 from app.services.analysis.scoring import (
+    apply_sparse_skill_caps,
+    cap_overall_score,
     overall_score,
     recommend,
     score_location,
@@ -42,6 +44,14 @@ class DeterministicRuleBasedProvider:
         preferred_skill_score, missing_preferred_skills = score_skill_match(preferred_skills, profile_text)
         all_job_skills = unique_preserve(required_skills + preferred_skills)
         resume_match_score = score_resume_match(all_job_skills, profile_text)
+        technical_skill_count = len(all_job_skills)
+        required_skill_score, preferred_skill_score, resume_match_score = apply_sparse_skill_caps(
+            required_skill_score=required_skill_score,
+            preferred_skill_score=preferred_skill_score,
+            resume_match_score=resume_match_score,
+            technical_skill_count=technical_skill_count,
+            has_clean_skill_sections=has_clean_skill_sections,
+        )
         location_fit_score = score_location(job.location, profile.target_locations or [])
         experience_fit_score = new_grad_fit_score
         total_score = overall_score(
@@ -51,6 +61,15 @@ class DeterministicRuleBasedProvider:
             resume_match_score=resume_match_score,
             location_fit_score=location_fit_score,
             authorization_risk=authorization_risk,
+        )
+        total_score = cap_overall_score(
+            score=total_score,
+            technical_skill_count=technical_skill_count,
+            has_clean_skill_sections=has_clean_skill_sections,
+            new_grad_fit_label=new_grad_fit_label,
+            new_grad_fit_score=new_grad_fit_score,
+            authorization_risk=authorization_risk,
+            negative_signals=negative_signals,
         )
         recommendation, recommendation_reason = recommend(
             overall=total_score,
@@ -66,6 +85,7 @@ class DeterministicRuleBasedProvider:
             has_required_skills=bool(required_skills),
             has_preferred_skills=bool(preferred_skills),
             has_clean_skill_sections=has_clean_skill_sections,
+            technical_skill_count=technical_skill_count,
             location_fit_score=location_fit_score,
             new_grad_fit_label=new_grad_fit_label,
             matched_skills=[skill for skill in all_job_skills if skill not in missing_required_skills + missing_preferred_skills],
@@ -78,6 +98,7 @@ class DeterministicRuleBasedProvider:
             has_required_skills=bool(required_skills),
             has_preferred_skills=bool(preferred_skills),
             has_clean_skill_sections=has_clean_skill_sections,
+            technical_skill_count=technical_skill_count,
             location_fit_score=location_fit_score,
             negative_signals=negative_signals,
         )
@@ -124,7 +145,13 @@ class DeterministicRuleBasedProvider:
             authorization_evidence=authorization_evidence,
             evidence=evidence,
             next_actions=next_actions,
-            analysis_confidence=self._confidence(required_skills, preferred_skills, seniority_signals, authorization_evidence),
+            analysis_confidence=self._confidence(
+                required_skills,
+                preferred_skills,
+                seniority_signals,
+                authorization_evidence,
+                has_clean_skill_sections=has_clean_skill_sections,
+            ),
         )
 
     def _profile_text(self, profile: Profile) -> str:
@@ -149,6 +176,7 @@ class DeterministicRuleBasedProvider:
         has_required_skills: bool,
         has_preferred_skills: bool,
         has_clean_skill_sections: bool,
+        technical_skill_count: int,
         location_fit_score: int,
         new_grad_fit_label: str,
         matched_skills: list[str],
@@ -156,12 +184,14 @@ class DeterministicRuleBasedProvider:
         strengths: list[str] = []
         if matched_skills:
             strengths.append(f"Profile matches key skills: {', '.join(matched_skills[:8])}.")
-        if has_required_skills and required_skill_score >= 75:
+        if has_required_skills and required_skill_score >= 75 and technical_skill_count >= 3 and has_clean_skill_sections:
             strengths.append("Strong coverage of required skills.")
         if has_preferred_skills and preferred_skill_score >= 75:
             strengths.append("Good overlap with preferred skills.")
         if not has_clean_skill_sections:
             strengths.append("The posting does not list clean required/preferred skill sections, so matching confidence is lower.")
+        if technical_skill_count <= 2:
+            strengths.append("The posting provides limited technical skill evidence, so matching confidence is lower.")
         if new_grad_fit_label in {"strong_fit", "good_fit"}:
             strengths.append("Posting includes new-grad friendly seniority signals.")
         if location_fit_score >= 80:
@@ -178,6 +208,7 @@ class DeterministicRuleBasedProvider:
         has_required_skills: bool,
         has_preferred_skills: bool,
         has_clean_skill_sections: bool,
+        technical_skill_count: int,
         location_fit_score: int,
         negative_signals: list[dict],
     ) -> list[str]:
@@ -186,6 +217,10 @@ class DeterministicRuleBasedProvider:
             concerns.append("No explicit required skills were detected, so the skill score is based on limited evidence.")
         if not has_preferred_skills and not has_clean_skill_sections:
             concerns.append("No explicit preferred skills were detected in a clean preferred-skills section.")
+        if technical_skill_count <= 2:
+            concerns.append("Only limited technical skill evidence was detected, so match confidence is lower.")
+        if not has_clean_skill_sections and technical_skill_count <= 2:
+            concerns.append("This posting is unstructured, so the score should be interpreted cautiously.")
         if missing_required_skills:
             concerns.append(f"Missing required skills: {', '.join(missing_required_skills[:8])}.")
         if missing_preferred_skills:
@@ -233,8 +268,12 @@ class DeterministicRuleBasedProvider:
         preferred_skills: list[str],
         seniority_signals: list[dict],
         authorization_evidence: list[dict],
+        *,
+        has_clean_skill_sections: bool,
     ) -> float:
         evidence_count = len(required_skills) + len(preferred_skills) + len(seniority_signals) + len(authorization_evidence)
+        if not has_clean_skill_sections and len(required_skills) + len(preferred_skills) <= 2:
+            return 0.52
         if evidence_count >= 8:
             return 0.86
         if evidence_count >= 4:

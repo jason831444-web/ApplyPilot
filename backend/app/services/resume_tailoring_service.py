@@ -70,17 +70,25 @@ class ResumeTailoringService:
         project_suggestions: list[str],
     ) -> str:
         role = self._first(profile.target_roles or []) or job.job_title or "software engineering"
-        skill_phrase = self._natural_skill_phrase(matched_skills[:8]) if matched_skills else "software engineering fundamentals"
+        if len(matched_skills) <= 1 and matched_skills:
+            skill_phrase = f"emphasizing {self._natural_skill_phrase(matched_skills)} where relevant"
+        else:
+            skill_phrase = self._natural_skill_phrase(matched_skills[:8]) if matched_skills else "software engineering fundamentals"
         project_theme = self._project_theme(project_suggestions, profile.projects or [])
         domain_signals = self._domain_signals(analysis)
 
         sentences = [
-            f"Computer Science new-grad candidate targeting {role} roles with hands-on experience in {skill_phrase}.",
+            self._summary_skill_sentence(role=role, skill_phrase=skill_phrase, matched_skill_count=len(matched_skills)),
             f"Project experience includes {project_theme}, with emphasis on production-minded backend, data, and dashboard workflows.",
         ]
         if domain_signals:
             sentences.append(f"For this role, emphasize relevant exposure to {self._natural_skill_phrase(domain_signals[:3])} without overstating experience.")
         return " ".join(sentences)
+
+    def _summary_skill_sentence(self, *, role: str, skill_phrase: str, matched_skill_count: int) -> str:
+        if matched_skill_count <= 1:
+            return f"Computer Science new-grad candidate targeting {role} roles, with resume tailoring focused on {skill_phrase}."
+        return f"Computer Science new-grad candidate targeting {role} roles with hands-on experience in {skill_phrase}."
 
     def _bullet_suggestions(
         self,

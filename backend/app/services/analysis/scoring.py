@@ -41,6 +41,25 @@ def score_resume_match(all_skills: list[str], profile_text: str) -> int:
     return score
 
 
+def apply_sparse_skill_caps(
+    *,
+    required_skill_score: int,
+    preferred_skill_score: int,
+    resume_match_score: int,
+    technical_skill_count: int,
+    has_clean_skill_sections: bool,
+) -> tuple[int, int, int]:
+    if technical_skill_count == 0:
+        return min(required_skill_score, 50), min(preferred_skill_score, 50), min(resume_match_score, 50)
+    if technical_skill_count == 1:
+        return min(required_skill_score, 70), min(preferred_skill_score, 70), min(resume_match_score, 65)
+    if technical_skill_count == 2 and not has_clean_skill_sections:
+        return min(required_skill_score, 80), min(preferred_skill_score, 80), min(resume_match_score, 80)
+    if not has_clean_skill_sections:
+        return min(required_skill_score, 88), min(preferred_skill_score, 88), min(resume_match_score, 88)
+    return required_skill_score, preferred_skill_score, resume_match_score
+
+
 def score_location(job_location: str | None, target_locations: list[str]) -> int:
     location = (job_location or "").lower()
     targets = [target.lower() for target in target_locations if target]
@@ -88,6 +107,28 @@ def overall_score(
         + location_fit_score * 0.10
         + authorization_score(authorization_risk) * 0.05
     )
+
+
+def cap_overall_score(
+    *,
+    score: int,
+    technical_skill_count: int,
+    has_clean_skill_sections: bool,
+    new_grad_fit_label: str,
+    new_grad_fit_score: int,
+    authorization_risk: str,
+    negative_signals: list[dict],
+) -> int:
+    capped_score = score
+    has_startup_intensity = any(int(signal.get("severity", 1)) >= 2 for signal in negative_signals)
+    if new_grad_fit_score < 45 and authorization_risk in {"unknown", "high"} and has_startup_intensity:
+        capped_score = min(capped_score, 55)
+    if new_grad_fit_label in {"weak_fit", "not_new_grad_friendly"}:
+        if not (technical_skill_count >= 4 and has_clean_skill_sections and authorization_risk == "low"):
+            capped_score = min(capped_score, 60)
+    if not has_clean_skill_sections and technical_skill_count <= 2:
+        capped_score = min(capped_score, 65)
+    return capped_score
 
 
 def score_new_grad_fit(
