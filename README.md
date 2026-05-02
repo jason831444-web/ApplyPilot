@@ -4,6 +4,21 @@ ApplyPilot is a full-stack job-fit decision engine for new-grad software enginee
 
 It is not a generic job tracker. ApplyPilot helps a candidate decide whether a job is worth applying to by analyzing the job description, comparing it against the candidate profile, surfacing sponsorship risk, and turning the result into an explainable recommendation.
 
+## Live Demo
+
+Frontend:
+https://applypilot-web.vercel.app
+
+Backend Health Check:
+https://applypilot-backend-nrtx.onrender.com/health
+
+Demo Account:
+
+- Email: `demo@applypilot.dev`
+- Password: `password123`
+
+Note: the backend is hosted on a free Render instance, so the first request may take up to 50 seconds if the server is sleeping.
+
 ## Problem
 
 New-grad candidates often apply to hundreds of roles without knowing which postings are realistic, which require senior experience, which hide sponsorship risk, or which skills are actually missing. Traditional job trackers store status, but they do not help candidates decide where to spend effort.
@@ -40,7 +55,7 @@ ApplyPilot lets a user:
 
 ## Demo Account
 
-After seeding demo data:
+The live demo and local seed data use:
 
 - Email: `demo@applypilot.dev`
 - Password: `password123`
@@ -55,12 +70,14 @@ The seed is idempotent. Running it multiple times updates the same demo user, jo
 
 ## Recommended Demo Flow
 
-1. Log in with the demo account.
-2. Open the dashboard.
-3. Open a strong-fit job from Best Opportunities.
-4. Review the recommendation, scores, evidence, missing skills, and authorization risk.
-5. Update the application status or next action.
-6. Return to the dashboard and confirm the pipeline insights update.
+1. Open the live frontend: https://applypilot-web.vercel.app
+2. Log in with the demo account.
+3. Open Dashboard to see job-search analytics.
+4. Open Jobs to review seeded job postings.
+5. Open a job detail page to review recommendation, match score, new-grad fit, authorization risk, missing skills, evidence, and next actions.
+6. Open Applications to review the application pipeline.
+7. Try Add Job by pasting a new job description.
+8. Return to Dashboard to see updated analytics.
 
 ## Screenshots
 
@@ -366,11 +383,12 @@ curl -X PATCH http://localhost:8000/api/applications/1 \
 
 ## Deployment Guide
 
-Target deployment:
+Current production deployment:
 
 - Database: Neon PostgreSQL
-- Backend: Render Web Service
-- Frontend: Vercel
+- Backend: Render Web Service, https://applypilot-backend-nrtx.onrender.com
+- Backend Health Check: https://applypilot-backend-nrtx.onrender.com/health
+- Frontend: Vercel, https://applypilot-web.vercel.app
 
 ### Neon PostgreSQL
 
@@ -409,7 +427,7 @@ DATABASE_URL=<Neon PostgreSQL connection string>
 SECRET_KEY=<generate a long random secret>
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=1440
-CORS_ORIGINS=http://localhost:3000,https://<your-vercel-app>.vercel.app
+CORS_ORIGINS=http://localhost:3000,https://applypilot-web.vercel.app
 ```
 
 After the first successful backend deploy, seed demo data from Render Shell:
@@ -431,13 +449,13 @@ Create a Vercel project:
 Vercel environment variable:
 
 ```bash
-NEXT_PUBLIC_API_BASE_URL=https://<your-render-backend>.onrender.com/api
+NEXT_PUBLIC_API_BASE_URL=https://applypilot-backend-nrtx.onrender.com/api
 ```
 
 After Vercel deploys, update Render:
 
 ```bash
-CORS_ORIGINS=http://localhost:3000,https://<your-vercel-app>.vercel.app
+CORS_ORIGINS=http://localhost:3000,https://applypilot-web.vercel.app
 ```
 
 Then redeploy the Render backend.
@@ -447,13 +465,13 @@ Then redeploy the Render backend.
 Backend health:
 
 ```bash
-curl https://<your-render-backend>.onrender.com/health
+curl https://applypilot-backend-nrtx.onrender.com/health
 ```
 
 Demo login:
 
 ```bash
-curl -X POST https://<your-render-backend>.onrender.com/api/auth/login \
+curl -X POST https://applypilot-backend-nrtx.onrender.com/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"demo@applypilot.dev","password":"password123"}'
 ```
@@ -461,18 +479,27 @@ curl -X POST https://<your-render-backend>.onrender.com/api/auth/login \
 Dashboard:
 
 ```bash
-curl https://<your-render-backend>.onrender.com/api/dashboard/summary \
+curl https://applypilot-backend-nrtx.onrender.com/api/dashboard/summary \
   -H "Authorization: Bearer <TOKEN>"
 ```
 
 Frontend:
 
-- Open `https://<your-vercel-app>.vercel.app`
+- Open `https://applypilot-web.vercel.app`
 - Login with `demo@applypilot.dev` / `password123`
 - Verify `/dashboard` loads seeded data
 - Verify `/jobs` loads demo jobs
 - Verify `/applications` loads the application pipeline
 - Verify `/jobs/new` can analyze a new pasted job
+
+## Production Notes
+
+- Render free instances may spin down after inactivity.
+- The app may take several seconds to respond on the first request.
+- JWTs are currently stored in `localStorage` for MVP simplicity.
+- For stronger production security, migrate auth to `httpOnly` secure cookies.
+- Do not commit real `.env` files.
+- Rotate database credentials if they were ever exposed outside the deployment environment.
 
 ## Testing Commands
 
