@@ -206,3 +206,7 @@ def test_sparse_technical_startup_posting_caps_match_scores() -> None:
     assert "Strong coverage of required skills." not in result.strengths
     assert any("limited technical skill evidence" in concern for concern in result.concerns)
     assert any("unstructured" in concern for concern in result.concerns)
+    assert any("typical new-grad expectations" in concern for concern in result.concerns)
+    assert any("Startup intensity and ownership expectations" in concern for concern in result.concerns)
+    assert any("Work authorization requirements are unclear" in concern for concern in result.concerns)
+    assert len(result.concerns) >= 4

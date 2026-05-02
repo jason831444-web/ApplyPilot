@@ -38,6 +38,13 @@ export type Profile = {
 
 export type ProfileUpdate = Omit<Profile, "id" | "user_id">;
 
+export type ResumeImportResult = {
+  resume_text: string;
+  skills_suggestions: string[];
+  projects_suggestions: string[];
+  experience_summary_suggestion: string;
+};
+
 export type ApplicationStatus =
   | "saved"
   | "applied"

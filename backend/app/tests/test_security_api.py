@@ -1,6 +1,6 @@
 from datetime import timedelta
 import csv
-from io import StringIO
+from io import BytesIO, StringIO
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -32,6 +32,30 @@ def register_and_login(prefix: str = "security") -> str:
 
 def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
+
+
+def make_text_pdf(text: str) -> bytes:
+    escaped_text = text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+    stream = f"BT /F1 12 Tf 72 720 Td ({escaped_text}) Tj ET".encode()
+    objects = [
+        b"1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n",
+        b"2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n",
+        b"3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj\n",
+        b"4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n",
+        f"5 0 obj << /Length {len(stream)} >> stream\n".encode() + stream + b"\nendstream endobj\n",
+    ]
+    output = BytesIO()
+    output.write(b"%PDF-1.4\n")
+    offsets: list[int] = []
+    for obj in objects:
+        offsets.append(output.tell())
+        output.write(obj)
+    xref_position = output.tell()
+    output.write(f"xref\n0 {len(objects) + 1}\n0000000000 65535 f \n".encode())
+    for offset in offsets:
+        output.write(f"{offset:010d} 00000 n \n".encode())
+    output.write(f"trailer << /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_position}\n%%EOF".encode())
+    return output.getvalue()
 
 
 def create_job(token: str) -> int:
@@ -359,3 +383,44 @@ def test_application_csv_export_is_user_scoped_and_includes_analysis_columns() -
     assert rows[0]["overall_score"]
     assert rows[0]["new_grad_fit_label"]
     assert rows[0]["authorization_risk"]
+
+
+def test_resume_upload_requires_file() -> None:
+    token = register_and_login("resume-file-required")
+
+    response = client.post("/api/profile/upload-resume", headers=auth_headers(token))
+
+    assert response.status_code == 422
+
+
+def test_resume_upload_rejects_non_pdf() -> None:
+    token = register_and_login("resume-non-pdf")
+
+    response = client.post(
+        "/api/profile/upload-resume",
+        headers=auth_headers(token),
+        files={"file": ("resume.txt", b"Python React FastAPI", "text/plain")},
+    )
+
+    assert response.status_code == 400
+
+
+def test_resume_upload_extracts_pdf_text_and_suggestions() -> None:
+    token = register_and_login("resume-pdf")
+    pdf = make_text_pdf(
+        "Computer Science new grad. Built ApplyPilot using Python, React, FastAPI, PostgreSQL, and Docker. "
+        "Developed DocuParse OCR parser with machine learning workflows."
+    )
+
+    response = client.post(
+        "/api/profile/upload-resume",
+        headers=auth_headers(token),
+        files={"file": ("resume.pdf", pdf, "application/pdf")},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "Built ApplyPilot" in data["resume_text"]
+    assert {"Python", "React", "FastAPI", "PostgreSQL", "Docker"} <= set(data["skills_suggestions"])
+    assert any("Built ApplyPilot" in project for project in data["projects_suggestions"])
+    assert data["experience_summary_suggestion"]

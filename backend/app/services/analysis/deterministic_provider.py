@@ -219,6 +219,8 @@ class DeterministicRuleBasedProvider:
             concerns.append("No explicit preferred skills were detected in a clean preferred-skills section.")
         if technical_skill_count <= 2:
             concerns.append("Only limited technical skill evidence was detected, so match confidence is lower.")
+        if technical_skill_count <= 1:
+            concerns.append("Skill matching confidence is limited due to sparse or unstructured technical requirements.")
         if not has_clean_skill_sections and technical_skill_count <= 2:
             concerns.append("This posting is unstructured, so the score should be interpreted cautiously.")
         if missing_required_skills:
@@ -227,16 +229,31 @@ class DeterministicRuleBasedProvider:
             concerns.append(f"Missing preferred skills: {', '.join(missing_preferred_skills[:8])}.")
         if new_grad_fit_label in {"weak_fit", "not_new_grad_friendly"}:
             concerns.append("Seniority or experience requirements may be above a new-grad level.")
+        if new_grad_fit_label == "weak_fit":
+            concerns.append("This role may not be well-aligned with typical new-grad expectations.")
         if negative_signals:
             labels = [str(signal.get("label", "")).replace("_", " ") for signal in negative_signals[:4]]
             concerns.append(f"Startup intensity or ownership signals may raise the bar for a new grad: {', '.join(labels)}.")
+            concerns.append("Startup intensity and ownership expectations may raise the bar for this role.")
         if authorization_risk == "high":
             concerns.append("Work authorization language appears high risk.")
+            concerns.append("This role may require work authorization or sponsorship that is not currently met.")
         elif authorization_risk == "unknown":
             concerns.append("No clear sponsorship or work authorization evidence was found.")
+            concerns.append("Work authorization requirements are unclear from the job posting.")
         if location_fit_score < 50:
             concerns.append("Location does not appear to match the profile targets.")
-        return concerns
+        return self._dedupe_text(concerns)
+
+    def _dedupe_text(self, values: list[str]) -> list[str]:
+        seen: set[str] = set()
+        result: list[str] = []
+        for value in values:
+            key = value.lower().strip().rstrip(".")
+            if key and key not in seen:
+                seen.add(key)
+                result.append(value)
+        return result
 
     def _has_clean_skill_sections(self, description: str) -> bool:
         return any(section_kind(heading) in {"required", "preferred"} for heading, _body in split_sections(description))

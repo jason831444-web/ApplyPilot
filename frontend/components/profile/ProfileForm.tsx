@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { apiRequest } from "@/lib/api";
+import { apiRequest, uploadResume } from "@/lib/api";
 import type { Profile, ProfileUpdate } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
@@ -44,6 +44,7 @@ export function ProfileForm() {
   const [workAuthorizationNotes, setWorkAuthorizationNotes] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingResume, setIsUploadingResume] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -146,6 +147,39 @@ export function ProfileForm() {
     }
   }
 
+  async function handleResumeUpload(file: File | undefined) {
+    if (!file || !token) {
+      return;
+    }
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+      setError("Please upload a PDF resume.");
+      return;
+    }
+
+    setIsUploadingResume(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const result = await uploadResume(file, token);
+      const confirmed = window.confirm(
+        "Replace resume text, skills, projects, and experience summary with suggestions from this PDF?",
+      );
+      if (!confirmed) {
+        setSuccess("Resume parsed. No profile fields were changed.");
+        return;
+      }
+      setResumeText(result.resume_text);
+      setSkillsInput(joinCommaList(result.skills_suggestions));
+      setProjectsInput(joinLineList(result.projects_suggestions));
+      setExperienceSummary(result.experience_summary_suggestion);
+      setSuccess("Resume imported. Review the suggestions, then save your profile.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to import resume.");
+    } finally {
+      setIsUploadingResume(false);
+    }
+  }
+
   if (isLoading) {
     return <LoadingState label="Loading profile..." />;
   }
@@ -158,7 +192,25 @@ export function ProfileForm() {
       {success ? <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">{success}</p> : null}
 
       <Card>
-        <CardHeader title="Resume" description="Paste the text you want ApplyPilot to compare against job requirements." />
+        <CardHeader
+          title="Resume"
+          description="Paste resume text or import a text-based PDF. Import suggestions are not saved until you click Save Profile."
+          action={
+            <label className="inline-flex cursor-pointer items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:bg-slate-50">
+              {isUploadingResume ? "Uploading..." : "Upload Resume (PDF)"}
+              <input
+                accept="application/pdf,.pdf"
+                className="sr-only"
+                disabled={isUploadingResume}
+                onChange={(event) => {
+                  void handleResumeUpload(event.target.files?.[0]);
+                  event.target.value = "";
+                }}
+                type="file"
+              />
+            </label>
+          }
+        />
         <CardBody className="space-y-4">
           <label className="block space-y-1 text-sm font-medium text-slate-700">
             <span>Resume text</span>

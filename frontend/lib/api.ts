@@ -1,4 +1,4 @@
-import type { BulkDeleteResponse, ResumeTailoring } from "./types";
+import type { BulkDeleteResponse, ResumeImportResult, ResumeTailoring } from "./types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api";
 
@@ -130,4 +130,28 @@ export async function exportApplicationsCsv(token: string): Promise<Blob> {
   }
 
   return response.blob();
+}
+
+export async function uploadResume(file: File, token: string): Promise<ResumeImportResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${normalizeApiBaseUrl(API_BASE_URL)}${normalizeApiPath("/api/profile/upload-resume")}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const fallback = `Resume upload failed with status ${response.status}`;
+    let payload: unknown;
+    try {
+      payload = isJsonResponse(response) ? await response.json() : await response.text();
+    } catch {
+      throw new Error(fallback);
+    }
+    throw new Error(getApiErrorMessage(payload, fallback));
+  }
+
+  return response.json() as Promise<ResumeImportResult>;
 }
