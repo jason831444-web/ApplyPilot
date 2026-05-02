@@ -10,9 +10,13 @@ function SkillPill({ value, tone }: { value: string; tone: "required" | "preferr
 export function MissingSkills({
   required,
   preferred,
+  requiredLabel = "Missing Required",
+  preferredLabel = "Missing Preferred",
 }: {
   required: string[];
   preferred: string[];
+  requiredLabel?: string;
+  preferredLabel?: string;
 }) {
   if (required.length === 0 && preferred.length === 0) {
     return <p className="text-sm text-slate-600">No missing skills were detected from the extracted job requirements.</p>;
@@ -21,14 +25,14 @@ export function MissingSkills({
   return (
     <div className="grid gap-4 md:grid-cols-2">
       <div>
-        <h4 className="text-sm font-semibold text-slate-900">Missing Required</h4>
+        <h4 className="text-sm font-semibold text-slate-900">{requiredLabel}</h4>
         <div className="mt-2 flex flex-wrap gap-2">
           {required.length > 0 ? required.map((skill) => <SkillPill key={skill} value={skill} tone="required" />) : null}
           {required.length === 0 ? <p className="text-sm text-slate-500">None detected.</p> : null}
         </div>
       </div>
       <div>
-        <h4 className="text-sm font-semibold text-slate-900">Missing Preferred</h4>
+        <h4 className="text-sm font-semibold text-slate-900">{preferredLabel}</h4>
         <div className="mt-2 flex flex-wrap gap-2">
           {preferred.length > 0
             ? preferred.map((skill) => <SkillPill key={skill} value={skill} tone="preferred" />)

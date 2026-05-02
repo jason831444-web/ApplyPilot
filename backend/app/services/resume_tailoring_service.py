@@ -10,6 +10,7 @@ from app.models.user import User
 from app.repositories.analyses import AnalysisRepository
 from app.schemas.resume_tailoring import ResumeTailoringRead
 from app.services.analysis.scoring import skill_match_patterns
+from app.services.analysis.rules import DOMAIN_SIGNAL_LABELS
 from app.services.job_service import JobService
 from app.services.profile_service import ProfileService
 
@@ -69,7 +70,7 @@ class ResumeTailoringService:
         project_suggestions: list[str],
     ) -> str:
         role = self._first(profile.target_roles or []) or job.job_title or "software engineering"
-        skill_phrase = self._join(matched_skills[:8]) if matched_skills else "software engineering fundamentals"
+        skill_phrase = self._natural_skill_phrase(matched_skills[:8]) if matched_skills else "software engineering fundamentals"
         project_theme = self._project_theme(project_suggestions, profile.projects or [])
         domain_signals = self._domain_signals(analysis)
 
@@ -78,7 +79,7 @@ class ResumeTailoringService:
             f"Project experience includes {project_theme}, with emphasis on production-minded backend, data, and dashboard workflows.",
         ]
         if domain_signals:
-            sentences.append(f"For this role, emphasize relevant exposure to {self._join(domain_signals[:3])} without overstating experience.")
+            sentences.append(f"For this role, emphasize relevant exposure to {self._natural_skill_phrase(domain_signals[:3])} without overstating experience.")
         return " ".join(sentences)
 
     def _bullet_suggestions(
@@ -91,7 +92,7 @@ class ResumeTailoringService:
         project_suggestions: list[str],
     ) -> list[str]:
         bullets: list[str] = []
-        skills = self._join(matched_skills[:5]) if matched_skills else "the most relevant existing technical skills"
+        skills = self._natural_skill_phrase(matched_skills[:5]) if matched_skills else "the most relevant existing technical skills"
 
         if project_suggestions:
             bullets.append(f"Highlight {project_suggestions[0]} as relevant project experience using {skills}.")
@@ -99,7 +100,7 @@ class ResumeTailoringService:
             bullets.append("Emphasize backend API design, database work, structured data handling, and production-minded implementation from existing projects.")
         if any(self._contains_signal(skill, {"React", "Next.js", "TypeScript", "JavaScript"}) for skill in matched_skills):
             bullets.append("Show full-stack delivery by connecting frontend dashboard work to backend services and persisted data.")
-        if any(self._contains_signal(skill, {"AI", "AI Agents", "Machine Learning", "Computer Vision", "Healthcare", "Health-tech"}) for skill in analysis.required_skills + analysis.preferred_skills):
+        if any(self._contains_signal(skill, {"AI", "AI Agents", "Machine Learning", "Computer Vision", "Healthcare", "Health-tech"}) for skill in self._analysis_signals(analysis)):
             bullets.append("If applying to AI, healthcare, or automation roles, mention relevant AI/CV project experience without overstating domain-specific healthcare experience.")
         if self._enum_value(analysis.new_grad_fit_label) in {"mixed_fit", "weak_fit", "not_new_grad_friendly"}:
             bullets.append("Tailor one bullet toward ownership, shipping complete features, and debugging production-style issues using work already represented in the profile.")
@@ -162,7 +163,15 @@ class ResumeTailoringService:
 
     def _domain_signals(self, analysis: JobAnalysis) -> list[str]:
         domain_values = {"AI", "AI Agents", "Healthcare", "Health-tech", "Startup", "Product Management"}
-        return [skill for skill in self._unique((analysis.required_skills or []) + (analysis.preferred_skills or [])) if skill in domain_values]
+        return [skill for skill in self._analysis_signals(analysis) if skill in domain_values]
+
+    def _analysis_signals(self, analysis: JobAnalysis) -> list[str]:
+        domain_values = [
+            str(item.get("label", ""))
+            for item in analysis.evidence or []
+            if item.get("type") == "domain" and str(item.get("label", "")) in DOMAIN_SIGNAL_LABELS
+        ]
+        return self._unique((analysis.required_skills or []) + (analysis.preferred_skills or []) + domain_values)
 
     def _project_theme(self, project_suggestions: list[str], projects: list[str]) -> str:
         selected = project_suggestions or [str(project) for project in projects if str(project).strip()]
@@ -181,6 +190,18 @@ class ResumeTailoringService:
         if len(clean_values) <= 1:
             return "".join(clean_values)
         return ", ".join(clean_values[:-1]) + f", and {clean_values[-1]}"
+
+    def _natural_skill_phrase(self, values: list[str]) -> str:
+        phrase_map = {
+            "Backend": "backend engineering",
+            "AI": "AI systems",
+            "AI Agents": "AI agent workflows",
+            "Healthcare": "healthcare workflows",
+            "Health-tech": "health-tech products",
+            "Startup": "startup environments",
+            "Product Management": "product management collaboration",
+        }
+        return self._join([phrase_map.get(value, value) for value in values])
 
     def _unique(self, values: list[str]) -> list[str]:
         seen: set[str] = set()

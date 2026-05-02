@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { formatTitle } from "@/lib/format";
 import type { JobAnalysis } from "@/lib/types";
 import { EvidenceList } from "./EvidenceList";
@@ -32,6 +33,23 @@ function TextList({ values, emptyText }: { values: string[]; emptyText: string }
         <li key={value}>{value}</li>
       ))}
     </ul>
+  );
+}
+
+function CollapsibleSection({
+  title,
+  children,
+  defaultOpen = false,
+}: {
+  title: string;
+  children: ReactNode;
+  defaultOpen?: boolean;
+}) {
+  return (
+    <details className="rounded-md border border-slate-200 bg-white p-5" open={defaultOpen}>
+      <summary className="cursor-pointer text-base font-semibold text-slate-950">{title}</summary>
+      <div className="mt-3">{children}</div>
+    </details>
   );
 }
 
@@ -89,23 +107,28 @@ export function JobAnalysisView({ analysis }: { analysis: JobAnalysis }) {
       </div>
 
       <section className="rounded-md border border-slate-200 bg-white p-5">
-        <h3 className="text-base font-semibold">Extracted Skills</h3>
+        <h3 className="text-base font-semibold">Extracted Signals</h3>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div>
-            <h4 className="text-sm font-semibold text-slate-900">Required</h4>
+            <h4 className="text-sm font-semibold text-slate-900">Technical Skills</h4>
             <div className="mt-2">
-              <PillList values={analysis.required_skills} emptyText="No required skills detected." />
+              <PillList values={analysis.technical_skills ?? [...analysis.required_skills, ...analysis.preferred_skills]} emptyText="No technical skills detected." />
             </div>
           </div>
           <div>
-            <h4 className="text-sm font-semibold text-slate-900">Preferred</h4>
+            <h4 className="text-sm font-semibold text-slate-900">Domain Signals</h4>
             <div className="mt-2">
-              <PillList values={analysis.preferred_skills} emptyText="No preferred skills detected." />
+              <PillList values={analysis.domain_signals ?? []} emptyText="No domain signals detected." />
             </div>
           </div>
         </div>
         <div className="mt-5">
-          <MissingSkills required={analysis.missing_required_skills} preferred={analysis.missing_preferred_skills} />
+          <MissingSkills
+            required={analysis.missing_technical_skills ?? analysis.missing_required_skills}
+            preferred={analysis.missing_domain_signals ?? []}
+            requiredLabel="Missing Technical Skills"
+            preferredLabel="Missing Domain Signals"
+          />
         </div>
       </section>
 
@@ -116,12 +139,9 @@ export function JobAnalysisView({ analysis }: { analysis: JobAnalysis }) {
             <TextList values={analysis.strengths} emptyText="No strengths detected." />
           </div>
         </section>
-        <section className="rounded-md border border-slate-200 bg-white p-5">
-          <h3 className="text-base font-semibold">Concerns</h3>
-          <div className="mt-3">
-            <TextList values={analysis.concerns} emptyText="No concerns detected." />
-          </div>
-        </section>
+        <CollapsibleSection title="Concerns">
+          <TextList values={analysis.concerns} emptyText="No concerns detected." />
+        </CollapsibleSection>
       </div>
 
       <section className="rounded-md border border-slate-200 bg-white p-5">
@@ -131,12 +151,9 @@ export function JobAnalysisView({ analysis }: { analysis: JobAnalysis }) {
         </div>
       </section>
 
-      <section className="rounded-md border border-slate-200 bg-white p-5">
-        <h3 className="text-base font-semibold">Evidence</h3>
-        <div className="mt-3">
-          <EvidenceList evidence={analysis.evidence} emptyText="No evidence captured." />
-        </div>
-      </section>
+      <CollapsibleSection title="Evidence">
+        <EvidenceList evidence={analysis.evidence} emptyText="No evidence captured." />
+      </CollapsibleSection>
     </div>
   );
 }

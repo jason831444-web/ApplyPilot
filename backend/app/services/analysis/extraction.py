@@ -5,6 +5,7 @@ from app.services.analysis.rules import (
     AUTHORIZATION_HIGH_PATTERNS,
     AUTHORIZATION_MEDIUM_PATTERNS,
     AUTHORIZATION_POSITIVE_PATTERNS,
+    DOMAIN_SIGNAL_LABELS,
     EXPERIENCE_RULES,
     PREFERRED_SECTION_PATTERNS,
     REQUIRED_SECTION_PATTERNS,
@@ -101,34 +102,40 @@ def extract_skills_by_requirement(text: str) -> tuple[list[str], list[str], list
         skills = find_skills(body)
         if not skills:
             continue
+        technical_skills = [skill for skill in skills if skill not in DOMAIN_SIGNAL_LABELS]
         kind = section_kind(heading)
         if kind in {"required", "preferred"}:
             has_clean_skill_sections = True
         if kind == "preferred":
-            preferred.extend(skills)
+            preferred.extend(technical_skills)
         elif kind == "required":
-            required.extend(skills)
+            required.extend(technical_skills)
         else:
             paragraph_hits = re.split(r"(?<=[.!?])\s+|\n+", body)
             for paragraph in paragraph_hits:
                 if re.search(r"\b(require|required|qualification|must have|need|experience with)\b", paragraph, re.IGNORECASE):
-                    required.extend(find_skills(paragraph))
+                    required.extend(skill for skill in find_skills(paragraph) if skill not in DOMAIN_SIGNAL_LABELS)
 
         for skill in skills:
             match = first_skill_match(skill, body)
             evidence_text = phrase_window(body, match.start(), match.end()) if match else f"{heading}: {skill}"
-            evidence.append(make_evidence("skill", skill, evidence_text))
+            evidence.append(make_evidence(evidence_type_for_skill(skill), skill, evidence_text))
 
     if not has_clean_skill_sections:
-        required = find_skills(text)
-        for skill in required:
+        all_skills = find_skills(text)
+        required = [skill for skill in all_skills if skill not in DOMAIN_SIGNAL_LABELS]
+        for skill in all_skills:
             match = first_skill_match(skill, text)
             evidence_text = phrase_window(text, match.start(), match.end()) if match else skill
-            evidence.append(make_evidence("skill", skill, evidence_text))
+            evidence.append(make_evidence(evidence_type_for_skill(skill), skill, evidence_text))
 
     required = unique_preserve(required)
     preferred = [skill for skill in unique_preserve(preferred) if skill not in required]
     return required, preferred, dedupe_evidence(evidence)
+
+
+def evidence_type_for_skill(skill: str) -> str:
+    return "domain" if skill in DOMAIN_SIGNAL_LABELS else "skill"
 
 
 def first_skill_match(skill: str, text: str) -> re.Match[str] | None:

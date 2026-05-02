@@ -1,7 +1,9 @@
 from types import SimpleNamespace
 
+from app.models.job_analysis import AuthorizationRisk, NewGradFitLabel
+from app.services.resume_tailoring_service import ResumeTailoringService
 from app.services.analysis.deterministic_provider import DeterministicRuleBasedProvider
-from app.services.analysis.evidence import dedupe_evidence
+from app.services.analysis.evidence import dedupe_evidence, phrase_window
 from app.services.analysis.extraction import extract_experience_signals, extract_skills_by_requirement
 
 
@@ -33,7 +35,7 @@ def test_evidence_is_deduplicated_by_type_label_source_and_text() -> None:
         {"type": "skill", "label": "Python", "source": "job_description", "text": "Python"},
     ]
 
-    assert dedupe_evidence(evidence) == [evidence[0], evidence[2]]
+    assert dedupe_evidence(evidence) == [evidence[0]]
 
 
 def make_profile() -> SimpleNamespace:
@@ -85,10 +87,12 @@ def test_ambiguous_startup_posting_extracts_signals_and_lowers_new_grad_fit() ->
 
     result = DeterministicRuleBasedProvider().analyze(profile=make_profile(), job=make_job(description))
     extracted = set(result.required_skills + result.preferred_skills)
+    domain_signals = {item["label"] for item in result.evidence if item["type"] == "domain"}
     evidence_text = " ".join(str(item.get("text", "")).lower() for item in result.evidence)
     negative_labels = {str(item.get("label", "")) for item in result.new_grad_negative_signals}
 
-    assert {"AI", "AI Agents", "Backend", "Product Management", "Healthcare", "Startup", "AWS"} <= extracted
+    assert {"Backend", "AWS"} <= extracted
+    assert {"AI", "AI Agents", "Product Management", "Healthcare", "Startup"} <= domain_signals
     assert result.new_grad_fit_label in {"mixed_fit", "weak_fit"}
     assert result.new_grad_fit_score <= 50
     assert result.recommendation in {"apply_with_caution", "maybe"}
@@ -102,3 +106,50 @@ def test_ambiguous_startup_posting_extracts_signals_and_lowers_new_grad_fit() ->
     assert "aws" in evidence_text
     assert "early stage startup" in evidence_text
     assert "significant revenue" in evidence_text
+
+
+def test_evidence_snippet_uses_natural_boundaries_and_length_limit() -> None:
+    text = (
+        "First sentence should not appear. "
+        "You will build AI agents for healthcare workflows with backend systems and AWS. "
+        "A final sentence follows."
+    )
+    start = text.index("AI agents")
+    snippet = phrase_window(text, start, start + len("AI agents"))
+
+    assert snippet.startswith("You will build")
+    assert len(snippet) <= 280
+    assert not snippet[0].islower()
+    assert snippet.endswith(".")
+
+
+def test_similar_duplicate_domain_evidence_is_reduced() -> None:
+    evidence = [
+        {"type": "domain", "label": "AI", "source": "job_description", "text": "You will build AI agents for healthcare workflows."},
+        {"type": "domain", "label": "AI", "source": "job_description", "text": "You will build AI agents for healthcare workflows and backend systems."},
+        {"type": "domain", "label": "AI", "source": "job_description", "text": "Passion for AI in healthcare is important."},
+    ]
+
+    deduped = dedupe_evidence(evidence)
+
+    assert len(deduped) == 2
+
+
+def test_resume_tailoring_uses_natural_backend_wording() -> None:
+    profile = make_profile()
+    job = make_job("Backend role using AWS.")
+    analysis = SimpleNamespace(
+        required_skills=["Backend", "AWS"],
+        preferred_skills=[],
+        missing_required_skills=[],
+        missing_preferred_skills=[],
+        evidence=[],
+        authorization_risk=AuthorizationRisk.unknown,
+        new_grad_fit_label=NewGradFitLabel.mixed_fit,
+    )
+    service = ResumeTailoringService.__new__(ResumeTailoringService)
+
+    result = service._generate(profile=profile, job=job, analysis=analysis)
+
+    assert "experience in Backend" not in result.tailored_summary
+    assert "backend engineering" in result.tailored_summary or "backend systems" in result.tailored_summary

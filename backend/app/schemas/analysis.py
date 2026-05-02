@@ -1,7 +1,9 @@
 from enum import Enum
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
+
+from app.services.analysis.rules import DOMAIN_SIGNAL_LABELS
 
 
 class NewGradFitLabel(str, Enum):
@@ -65,4 +67,44 @@ class JobAnalysisRead(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    @computed_field
+    @property
+    def technical_skills(self) -> list[str]:
+        return unique_strings(
+            [skill for skill in self.required_skills + self.preferred_skills if skill not in DOMAIN_SIGNAL_LABELS]
+        )
+
+    @computed_field
+    @property
+    def domain_signals(self) -> list[str]:
+        values = [str(item.get("label", "")) for item in self.evidence if item.get("type") == "domain"]
+        return unique_strings([value for value in values if value in DOMAIN_SIGNAL_LABELS])
+
+    @computed_field
+    @property
+    def missing_technical_skills(self) -> list[str]:
+        return unique_strings(
+            [
+                skill
+                for skill in self.missing_required_skills + self.missing_preferred_skills
+                if skill not in DOMAIN_SIGNAL_LABELS
+            ]
+        )
+
+    @computed_field
+    @property
+    def missing_domain_signals(self) -> list[str]:
+        return []
+
     model_config = {"from_attributes": True}
+
+
+def unique_strings(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for value in values:
+        key = value.lower()
+        if value and key not in seen:
+            seen.add(key)
+            result.append(value)
+    return result

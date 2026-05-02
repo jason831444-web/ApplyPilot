@@ -95,6 +95,8 @@ export type JobAnalysis = {
   seniority_signals: AnalysisEvidence[];
   required_skills: string[];
   preferred_skills: string[];
+  technical_skills: string[];
+  domain_signals: string[];
   experience_requirements: AnalysisEvidence[];
   overall_score: number;
   new_grad_fit_score: number;
@@ -112,6 +114,8 @@ export type JobAnalysis = {
   concerns: string[];
   missing_required_skills: string[];
   missing_preferred_skills: string[];
+  missing_technical_skills: string[];
+  missing_domain_signals: string[];
   new_grad_positive_signals: AnalysisEvidence[];
   new_grad_negative_signals: AnalysisEvidence[];
   authorization_evidence: AnalysisEvidence[];

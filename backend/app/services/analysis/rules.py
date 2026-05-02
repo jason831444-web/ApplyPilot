@@ -44,6 +44,15 @@ SKILL_PATTERNS: dict[str, list[str]] = {
     "Startup": [r"\bstartup\b", r"\bstart-up\b", r"\bseed stage\b", r"\bearly stage\b"],
 }
 
+DOMAIN_SIGNAL_LABELS = {
+    "AI",
+    "AI Agents",
+    "Healthcare",
+    "Health-tech",
+    "Startup",
+    "Product Management",
+}
+
 REQUIRED_SECTION_PATTERNS = [
     r"requirements?",
     r"qualifications?",
