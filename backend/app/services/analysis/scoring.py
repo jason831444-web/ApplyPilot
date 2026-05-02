@@ -9,7 +9,7 @@ def clamp_score(value: float) -> int:
 
 def score_skill_match(skills: list[str], profile_text: str) -> tuple[int, list[str]]:
     if not skills:
-        return 100, []
+        return 50, []
 
     matched: list[str] = []
     missing: list[str] = []
@@ -103,11 +103,16 @@ def score_new_grad_fit(
     has_senior_title = bool(labels & {"senior", "staff", "principal", "lead", "architect"})
     has_very_high_experience = "5+ years" in labels
     has_high_experience = "3+ years" in labels
+    negative_severity = sum(int(signal.get("severity", 1)) for signal in negative_signals)
 
     if has_senior_title or has_very_high_experience:
         return "not_new_grad_friendly", 15
+    if negative_severity >= 6:
+        return "weak_fit", 38
     if has_high_experience:
         return "weak_fit", 35
+    if negative_severity >= 3:
+        return "mixed_fit", 50
     if has_strong_positive and not negative_signals:
         return "strong_fit", 90
     if has_good_positive and not negative_signals:
@@ -133,6 +138,8 @@ def recommend(
         return "skip", "The posting has explicit no-sponsorship or restricted work-authorization language, and your profile suggests future sponsorship may be needed."
     if new_grad_fit_label == "not_new_grad_friendly":
         return "skip", "The role shows senior-level or high-experience signals that are not new-grad friendly."
+    if new_grad_fit_label == "weak_fit" and authorization_risk in {"medium", "unknown"}:
+        return "maybe", "The role has weak new-grad fit and unclear or non-low authorization evidence, so it is not a clear apply target."
     if overall < 40:
         return "skip", "The match score is low after considering skills, experience fit, location, and authorization risk."
     if overall >= 78 and new_grad_fit_label in {"strong_fit", "good_fit"} and authorization_risk != "high":

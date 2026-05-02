@@ -35,6 +35,13 @@ SKILL_PATTERNS: dict[str, list[str]] = {
     "HTML": [r"\bhtml\b"],
     "CSS": [r"\bcss\b"],
     "Tailwind CSS": [r"\btailwind(?: css)?\b"],
+    "AI": [r"\bai\b", r"\bartificial intelligence\b"],
+    "AI Agents": [r"\bai agents?\b", r"\bagentic ai\b"],
+    "Backend": [r"\bbackend\b", r"\bback[- ]end\b"],
+    "Product Management": [r"\bproduct manager\b", r"\bproduct management\b"],
+    "Healthcare": [r"\bhealthcare\b", r"\bhealth care\b", r"\bclinical workflows?\b"],
+    "Health-tech": [r"\bhealth[- ]?tech\b", r"\bdigital health\b"],
+    "Startup": [r"\bstartup\b", r"\bstart-up\b", r"\bseed stage\b", r"\bearly stage\b"],
 }
 
 REQUIRED_SECTION_PATTERNS = [
@@ -80,6 +87,14 @@ EXPERIENCE_RULES = [
     SignalRule("principal", r"\bprincipal\b", "negative", 3),
     SignalRule("lead", r"\blead\b", "negative", 3),
     SignalRule("architect", r"\barchitect\b", "negative", 3),
+    SignalRule("high ownership", r"\bhigh degree of ownership\b|\bhigh ownership\b|\bown(?:ership)? .* end[- ]to[- ]end\b", "negative", 2),
+    SignalRule("all rounder", r"\ball[- ]rounder\b|\ball rounder\b", "negative", 2),
+    SignalRule("5 days a week in person", r"\b5 days a week\b.{0,50}\bin person\b|\bin person\b.{0,50}\b5 days a week\b", "negative", 2),
+    SignalRule("6 days a week", r"\b6 days a week\b|\bsix days a week\b", "negative", 3),
+    SignalRule("production-ready product in 2 days", r"\bproduction[- ]ready\b.{0,80}\binstagram\b.{0,80}\b2 days\b|\binstagram\b.{0,80}\b2 days\b", "negative", 3),
+    SignalRule("many roles in one", r"\binsanely good product manager, designer, and backend/ai engineer all in one\b|\bproduct manager\b.{0,80}\bdesigner\b.{0,80}\bbackend/ai engineer\b", "negative", 3),
+    SignalRule("significant revenue", r"\bbuilt and scaled\b.{0,80}\bsignificant revenue\b|\bsignificant revenue\b", "negative", 3),
+    SignalRule("early stage startup experience", r"\bearly stage startup experience\b|\bseed stage startup\b|\bstartup intensity\b", "negative", 2),
 ]
 
 AUTHORIZATION_POSITIVE_PATTERNS = [

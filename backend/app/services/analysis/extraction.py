@@ -95,12 +95,15 @@ def extract_skills_by_requirement(text: str) -> tuple[list[str], list[str], list
     required: list[str] = []
     preferred: list[str] = []
     evidence: list[dict] = []
+    has_clean_skill_sections = False
 
     for heading, body in split_sections(text):
         skills = find_skills(body)
         if not skills:
             continue
         kind = section_kind(heading)
+        if kind in {"required", "preferred"}:
+            has_clean_skill_sections = True
         if kind == "preferred":
             preferred.extend(skills)
         elif kind == "required":
@@ -112,16 +115,28 @@ def extract_skills_by_requirement(text: str) -> tuple[list[str], list[str], list
                     required.extend(find_skills(paragraph))
 
         for skill in skills:
-            evidence.append(make_evidence("skill", skill, f"{heading}: {skill}"))
+            match = first_skill_match(skill, body)
+            evidence_text = phrase_window(body, match.start(), match.end()) if match else f"{heading}: {skill}"
+            evidence.append(make_evidence("skill", skill, evidence_text))
 
-    if not required and not preferred:
+    if not has_clean_skill_sections:
         required = find_skills(text)
         for skill in required:
-            evidence.append(make_evidence("skill", skill, skill))
+            match = first_skill_match(skill, text)
+            evidence_text = phrase_window(text, match.start(), match.end()) if match else skill
+            evidence.append(make_evidence("skill", skill, evidence_text))
 
     required = unique_preserve(required)
     preferred = [skill for skill in unique_preserve(preferred) if skill not in required]
     return required, preferred, dedupe_evidence(evidence)
+
+
+def first_skill_match(skill: str, text: str) -> re.Match[str] | None:
+    for pattern in SKILL_PATTERNS.get(skill, []):
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            return match
+    return None
 
 
 def extract_experience_signals(text: str) -> tuple[list[dict], list[dict], list[dict]]:

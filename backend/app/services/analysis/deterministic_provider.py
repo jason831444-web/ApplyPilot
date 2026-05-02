@@ -6,6 +6,8 @@ from app.services.analysis.extraction import (
     extract_authorization,
     extract_experience_signals,
     extract_skills_by_requirement,
+    section_kind,
+    split_sections,
     unique_preserve,
 )
 from app.services.analysis.provider import JobAnalysisResult
@@ -26,6 +28,7 @@ class DeterministicRuleBasedProvider:
     def analyze(self, profile: Profile, job: Job) -> JobAnalysisResult:
         description = job.job_description or ""
         required_skills, preferred_skills, skill_evidence = extract_skills_by_requirement(description)
+        has_clean_skill_sections = self._has_clean_skill_sections(description)
         seniority_signals, positive_signals, negative_signals = extract_experience_signals(description)
         authorization_risk, authorization_evidence = extract_authorization(description)
         new_grad_fit_label, new_grad_fit_score = score_new_grad_fit(
@@ -60,6 +63,9 @@ class DeterministicRuleBasedProvider:
         strengths = self._strengths(
             required_skill_score=required_skill_score,
             preferred_skill_score=preferred_skill_score,
+            has_required_skills=bool(required_skills),
+            has_preferred_skills=bool(preferred_skills),
+            has_clean_skill_sections=has_clean_skill_sections,
             location_fit_score=location_fit_score,
             new_grad_fit_label=new_grad_fit_label,
             matched_skills=[skill for skill in all_job_skills if skill not in missing_required_skills + missing_preferred_skills],
@@ -69,7 +75,11 @@ class DeterministicRuleBasedProvider:
             new_grad_fit_label=new_grad_fit_label,
             missing_required_skills=missing_required_skills,
             missing_preferred_skills=missing_preferred_skills,
+            has_required_skills=bool(required_skills),
+            has_preferred_skills=bool(preferred_skills),
+            has_clean_skill_sections=has_clean_skill_sections,
             location_fit_score=location_fit_score,
+            negative_signals=negative_signals,
         )
         next_actions = self._next_actions(
             recommendation=recommendation,
@@ -136,6 +146,9 @@ class DeterministicRuleBasedProvider:
         *,
         required_skill_score: int,
         preferred_skill_score: int,
+        has_required_skills: bool,
+        has_preferred_skills: bool,
+        has_clean_skill_sections: bool,
         location_fit_score: int,
         new_grad_fit_label: str,
         matched_skills: list[str],
@@ -143,10 +156,12 @@ class DeterministicRuleBasedProvider:
         strengths: list[str] = []
         if matched_skills:
             strengths.append(f"Profile matches key skills: {', '.join(matched_skills[:8])}.")
-        if required_skill_score >= 75:
+        if has_required_skills and required_skill_score >= 75:
             strengths.append("Strong coverage of required skills.")
-        if preferred_skill_score >= 75:
+        if has_preferred_skills and preferred_skill_score >= 75:
             strengths.append("Good overlap with preferred skills.")
+        if not has_clean_skill_sections:
+            strengths.append("The posting does not list clean required/preferred skill sections, so matching confidence is lower.")
         if new_grad_fit_label in {"strong_fit", "good_fit"}:
             strengths.append("Posting includes new-grad friendly seniority signals.")
         if location_fit_score >= 80:
@@ -160,15 +175,26 @@ class DeterministicRuleBasedProvider:
         new_grad_fit_label: str,
         missing_required_skills: list[str],
         missing_preferred_skills: list[str],
+        has_required_skills: bool,
+        has_preferred_skills: bool,
+        has_clean_skill_sections: bool,
         location_fit_score: int,
+        negative_signals: list[dict],
     ) -> list[str]:
         concerns: list[str] = []
+        if not has_required_skills:
+            concerns.append("No explicit required skills were detected, so the skill score is based on limited evidence.")
+        if not has_preferred_skills and not has_clean_skill_sections:
+            concerns.append("No explicit preferred skills were detected in a clean preferred-skills section.")
         if missing_required_skills:
             concerns.append(f"Missing required skills: {', '.join(missing_required_skills[:8])}.")
         if missing_preferred_skills:
             concerns.append(f"Missing preferred skills: {', '.join(missing_preferred_skills[:8])}.")
         if new_grad_fit_label in {"weak_fit", "not_new_grad_friendly"}:
             concerns.append("Seniority or experience requirements may be above a new-grad level.")
+        if negative_signals:
+            labels = [str(signal.get("label", "")).replace("_", " ") for signal in negative_signals[:4]]
+            concerns.append(f"Startup intensity or ownership signals may raise the bar for a new grad: {', '.join(labels)}.")
         if authorization_risk == "high":
             concerns.append("Work authorization language appears high risk.")
         elif authorization_risk == "unknown":
@@ -176,6 +202,9 @@ class DeterministicRuleBasedProvider:
         if location_fit_score < 50:
             concerns.append("Location does not appear to match the profile targets.")
         return concerns
+
+    def _has_clean_skill_sections(self, description: str) -> bool:
+        return any(section_kind(heading) in {"required", "preferred"} for heading, _body in split_sections(description))
 
     def _next_actions(
         self,
