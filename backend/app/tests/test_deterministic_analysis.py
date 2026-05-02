@@ -3,7 +3,7 @@ from types import SimpleNamespace
 from app.models.job_analysis import AuthorizationRisk, NewGradFitLabel
 from app.services.resume_tailoring_service import ResumeTailoringService
 from app.services.analysis.deterministic_provider import DeterministicRuleBasedProvider
-from app.services.analysis.evidence import dedupe_evidence, phrase_window
+from app.services.analysis.evidence import dedupe_evidence, extract_sentence_evidence, phrase_window
 from app.services.analysis.extraction import extract_experience_signals, extract_skills_by_requirement
 
 
@@ -153,3 +153,31 @@ def test_resume_tailoring_uses_natural_backend_wording() -> None:
 
     assert "experience in Backend" not in result.tailored_summary
     assert "backend engineering" in result.tailored_summary or "backend systems" in result.tailored_summary
+
+
+ASHA_SAMPLE_TEXT = """
+About The Role
+We are building AI agents for healthcare workflows. But we're still small enough that we're looking for all rounders that take a high degree of ownership.
+
+Who Should Apply
+The role is in person 5 days a week, most of the team works 6 days a week. :)
+
+Who Should Not Apply
+If you are not super confident in your engineering & product skills, for example if we asked you to build a production-ready version of Instagram in 2 days and that sounds difficult, hit that X button.
+"""
+
+
+def test_asha_evidence_sentence_excerpts_are_not_mid_word_fragments() -> None:
+    high_ownership = extract_sentence_evidence(ASHA_SAMPLE_TEXT, "high degree of ownership")
+    in_person = extract_sentence_evidence(ASHA_SAMPLE_TEXT, "5 days a week")
+    six_days = extract_sentence_evidence(ASHA_SAMPLE_TEXT, "6 days a week")
+    production_ready = extract_sentence_evidence(ASHA_SAMPLE_TEXT, "production-ready version of Instagram in 2 days")
+    snippets = [high_ownership, in_person, six_days, production_ready]
+
+    assert high_ownership.startswith("But we're still small enough")
+    assert in_person.startswith("The role is in person")
+    assert not six_days.startswith("le :)")
+    assert production_ready.startswith("If you are not super confident")
+    assert not production_ready.startswith("er confident")
+    assert all(len(snippet) <= 300 for snippet in snippets)
+    assert all(not snippet[0].islower() for snippet in snippets)

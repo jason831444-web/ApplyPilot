@@ -48,19 +48,113 @@ def dedupe_evidence(items: list[dict]) -> list[dict]:
 
 
 def phrase_window(text: str, start: int, end: int, window: int = 90) -> str:
-    if not text:
+    _ = window
+    matched_phrase = text[start:end]
+    return extract_sentence_evidence(text, matched_phrase)
+
+
+def extract_sentence_evidence(text: str, matched_phrase: str, max_chars: int = MAX_EVIDENCE_TEXT_LENGTH) -> str:
+    if not text or not matched_phrase:
         return ""
 
-    left = sentence_left_boundary(text, start)
-    right = sentence_right_boundary(text, end)
-    snippet = text[left:right].strip()
+    units = sentence_like_units(text)
+    phrase = normalize_whitespace(matched_phrase).lower()
+    for unit in units:
+        if phrase in normalize_whitespace(unit).lower():
+            return clean_evidence_text(trim_sentence_unit(unit, matched_phrase, max_chars))
 
-    if len(normalize_whitespace(snippet)) > MAX_EVIDENCE_TEXT_LENGTH:
-        left = word_left_boundary(text, max(0, start - window))
-        right = word_right_boundary(text, min(len(text), end + window))
-        snippet = text[left:right].strip()
+    paragraph = paragraph_containing_phrase(text, matched_phrase)
+    if paragraph:
+        return clean_evidence_text(trim_sentence_unit(paragraph, matched_phrase, max_chars))
 
-    return clamp_snippet(snippet)
+    return clean_evidence_text(clamp_snippet(matched_phrase, max_chars))
+
+
+def sentence_like_units(text: str) -> list[str]:
+    normalized_lines = [normalize_whitespace(line) for line in text.replace("\r", "\n").split("\n")]
+    units: list[str] = []
+    heading_pattern = re.compile(r"^[A-Z][A-Za-z /&+-]{2,70}:?$")
+
+    for line in normalized_lines:
+        if not line:
+            continue
+        if heading_pattern.match(line) and len(line.split()) <= 6:
+            continue
+        sentence_parts = re.split(r"(?<=[.!?])\s+", line)
+        for part in sentence_parts:
+            clean_part = strip_heading_prefix(part)
+            if clean_part:
+                units.append(clean_part)
+    return units
+
+
+def paragraph_containing_phrase(text: str, matched_phrase: str) -> str:
+    phrase = normalize_whitespace(matched_phrase).lower()
+    for paragraph in re.split(r"\n\s*\n|\n", text):
+        normalized = normalize_whitespace(strip_heading_prefix(paragraph))
+        if phrase in normalized.lower():
+            return normalized
+    return ""
+
+
+def strip_heading_prefix(value: str) -> str:
+    text = normalize_whitespace(value)
+    return re.sub(
+        r"^(?:About The Role|Who Should Not Apply|Who Should Apply|Responsibilities|Qualifications|Requirements|Preferred Qualifications)\s*:?\s+",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+
+def trim_sentence_unit(unit: str, matched_phrase: str, max_chars: int) -> str:
+    sentence = normalize_whitespace(unit)
+    if len(sentence) <= max_chars:
+        return sentence
+
+    match_index = sentence.lower().find(normalize_whitespace(matched_phrase).lower())
+    if match_index < 0:
+        return clamp_snippet(sentence, max_chars)
+
+    if match_index <= max_chars // 2:
+        return clamp_snippet(sentence, max_chars)
+
+    clause_start = nearest_clause_start(sentence, match_index, max_chars)
+    excerpt = sentence[clause_start:]
+    if clause_start > 0:
+        excerpt = f"...{excerpt}"
+    return clamp_snippet(excerpt, max_chars)
+
+
+def nearest_clause_start(sentence: str, match_index: int, max_chars: int) -> int:
+    search_start = max(0, match_index - max_chars // 2)
+    candidates = [
+        sentence.rfind(marker, search_start, match_index)
+        for marker in [". ", "! ", "? ", "; ", ": ", ", "]
+    ]
+    boundary = max(candidates)
+    if boundary >= search_start:
+        return word_left_boundary(sentence, boundary + 2)
+    return word_left_boundary(sentence, search_start)
+
+
+def clean_evidence_text(text: str) -> str:
+    cleaned = normalize_whitespace(text)
+    cleaned = re.sub(r"^[\s\-–—:;,.!?()\[\]{}]+", "", cleaned)
+    cleaned = remove_broken_leading_fragment(cleaned)
+    if cleaned and cleaned[0].islower():
+        cleaned = cleaned[0].upper() + cleaned[1:]
+    return cleaned
+
+
+def remove_broken_leading_fragment(text: str) -> str:
+    period_index = text.find(".")
+    if 0 <= period_index <= 35:
+        leading_words = text[:period_index].split()
+        remainder = text[period_index + 1 :].strip()
+        if len(leading_words) < 3 and remainder:
+            return remainder
+    return text
 
 
 def sentence_left_boundary(text: str, start: int) -> int:
@@ -93,15 +187,20 @@ def clamp_snippet(text: str, max_length: int = MAX_EVIDENCE_TEXT_LENGTH) -> str:
     if len(snippet) <= max_length:
         return snippet
 
-    clipped = snippet[:max_length].rstrip()
+    ellipsis_prefix = snippet.startswith("...")
+    available_length = max_length - 3 if ellipsis_prefix else max_length
+    body = snippet[3:] if ellipsis_prefix else snippet
+    clipped = body[:available_length].rstrip()
     boundary = max(clipped.rfind("."), clipped.rfind("!"), clipped.rfind("?"))
     if boundary >= 80:
-        return clipped[: boundary + 1]
+        result = clipped[: boundary + 1]
+        return f"...{result}" if ellipsis_prefix else result
 
     word_boundary = clipped.rfind(" ")
     if word_boundary >= 80:
-        return clipped[:word_boundary].rstrip()
-    return clipped
+        result = clipped[:word_boundary].rstrip()
+        return f"...{result}..." if ellipsis_prefix else f"{result}..."
+    return f"...{clipped}..." if ellipsis_prefix else f"{clipped}..."
 
 
 def is_similar_to_existing(text: str, existing_texts: list[str]) -> bool:
