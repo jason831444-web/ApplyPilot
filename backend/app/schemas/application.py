@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from enum import Enum
+from typing import Annotated
 
 from pydantic import BaseModel, Field
 
@@ -70,3 +71,14 @@ class ApplicationAnalysisSummary(BaseModel):
 class ApplicationWithJobRead(ApplicationRead):
     job: ApplicationJobSummary
     analysis: ApplicationAnalysisSummary | None = None
+
+
+PositiveId = Annotated[int, Field(gt=0)]
+
+
+class BulkDeleteApplicationsRequest(BaseModel):
+    application_ids: list[PositiveId] = Field(min_length=1, max_length=100)
+
+
+class BulkDeleteResponse(BaseModel):
+    deleted_count: int = Field(ge=0)

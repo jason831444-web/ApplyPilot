@@ -63,3 +63,15 @@ class JobRepository:
         self.db.execute(delete(Application).where(Application.job_id == job.id, Application.user_id == job.user_id))
         self.db.delete(job)
         self.db.commit()
+
+    def bulk_delete_for_user(self, *, user_id: int, job_ids: list[int]) -> int:
+        owned_ids_statement = select(Job.id).where(Job.user_id == user_id, Job.id.in_(job_ids))
+        owned_job_ids = list(self.db.scalars(owned_ids_statement).all())
+        if not owned_job_ids:
+            return 0
+
+        self.db.execute(delete(JobAnalysis).where(JobAnalysis.user_id == user_id, JobAnalysis.job_id.in_(owned_job_ids)))
+        self.db.execute(delete(Application).where(Application.user_id == user_id, Application.job_id.in_(owned_job_ids)))
+        result = self.db.execute(delete(Job).where(Job.user_id == user_id, Job.id.in_(owned_job_ids)))
+        self.db.commit()
+        return int(result.rowcount or 0)

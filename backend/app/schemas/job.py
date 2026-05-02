@@ -1,5 +1,6 @@
 from datetime import datetime
 from enum import Enum
+from typing import Annotated
 
 from pydantic import BaseModel, Field, HttpUrl, field_validator
 
@@ -84,3 +85,14 @@ class AnalyzeNewJobResponse(BaseModel):
     job: JobRead
     application: ApplicationRead
     analysis: JobAnalysisRead
+
+
+PositiveId = Annotated[int, Field(gt=0)]
+
+
+class BulkDeleteJobsRequest(BaseModel):
+    job_ids: list[PositiveId] = Field(min_length=1, max_length=100)
+
+
+class BulkDeleteResponse(BaseModel):
+    deleted_count: int = Field(ge=0)

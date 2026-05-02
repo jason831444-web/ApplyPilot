@@ -8,6 +8,8 @@ from app.schemas.application import (
     ApplicationRead,
     ApplicationUpdate,
     ApplicationWithJobRead,
+    BulkDeleteApplicationsRequest,
+    BulkDeleteResponse,
 )
 from app.services.application_service import ApplicationService
 
@@ -38,6 +40,19 @@ def create_application(
 def list_applications(current_user: CurrentUser, db: DbSession) -> list[ApplicationWithJobRead]:
     applications = ApplicationService(db).list_for_user(current_user.id)
     return [to_application_with_job(application) for application in applications]
+
+
+@router.delete("/bulk", response_model=BulkDeleteResponse)
+def bulk_delete_applications(
+    payload: BulkDeleteApplicationsRequest,
+    current_user: CurrentUser,
+    db: DbSession,
+) -> BulkDeleteResponse:
+    deleted_count = ApplicationService(db).bulk_delete_for_user(
+        user_id=current_user.id,
+        application_ids=payload.application_ids,
+    )
+    return BulkDeleteResponse(deleted_count=deleted_count)
 
 
 @router.get("/{application_id}", response_model=ApplicationWithJobRead)

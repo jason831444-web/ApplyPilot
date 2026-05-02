@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -96,3 +96,10 @@ class ApplicationRepository:
     def delete(self, application: Application) -> None:
         self.db.delete(application)
         self.db.commit()
+
+    def bulk_delete_for_user(self, *, user_id: int, application_ids: list[int]) -> int:
+        result = self.db.execute(
+            delete(Application).where(Application.user_id == user_id, Application.id.in_(application_ids))
+        )
+        self.db.commit()
+        return int(result.rowcount or 0)

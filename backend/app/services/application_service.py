@@ -53,3 +53,6 @@ class ApplicationService:
     def delete_for_user(self, *, user_id: int, application_id: int) -> None:
         application = self.get_for_user(user_id=user_id, application_id=application_id)
         self.applications.delete(application)
+
+    def bulk_delete_for_user(self, *, user_id: int, application_ids: list[int]) -> int:
+        return self.applications.bulk_delete_for_user(user_id=user_id, application_ids=application_ids)

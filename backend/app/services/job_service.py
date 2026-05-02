@@ -46,6 +46,9 @@ class JobService:
         job = self.get_for_user(user=user, job_id=job_id)
         self.jobs.delete(job=job)
 
+    def bulk_delete_for_user(self, *, user: User, job_ids: list[int]) -> int:
+        return self.jobs.bulk_delete_for_user(user_id=user.id, job_ids=job_ids)
+
     def analyze_for_user(self, *, user: User, job_id: int) -> JobAnalysis:
         job = self.get_for_user(user=user, job_id=job_id)
         return self._run_analysis(user=user, job=job)

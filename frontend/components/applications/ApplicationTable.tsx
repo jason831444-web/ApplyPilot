@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { RecommendationBadge } from "@/components/jobs/RecommendationBadge";
 import { useAuth } from "@/hooks/useAuth";
-import { apiRequest } from "@/lib/api";
+import { apiRequest, bulkDeleteApplications } from "@/lib/api";
 import { formatTitle } from "@/lib/format";
 import type { ApplicationStatus, ApplicationWithJob } from "@/lib/types";
+import { Button } from "@/components/ui/Button";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/State";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ScoreBadge } from "@/components/ui/Badge";
@@ -33,42 +34,36 @@ function isUpcoming(value: string | null): boolean {
 export function ApplicationTable() {
   const { token } = useAuth();
   const [applications, setApplications] = useState<ApplicationWithJob[]>([]);
+  const [selectedApplicationIds, setSelectedApplicationIds] = useState<number[]>([]);
   const [statusFilter, setStatusFilter] = useState<ApplicationStatus | "all">("all");
   const [isLoading, setIsLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadApplications = useCallback(async () => {
     if (!token) {
       return;
     }
 
-    let isMounted = true;
-
-    async function loadApplications() {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const data = await apiRequest<ApplicationWithJob[]>("/api/applications", { token });
-        if (isMounted) {
-          setApplications(data);
-        }
-      } catch (err) {
-        if (isMounted) {
-          setError(err instanceof Error ? err.message : "Unable to load applications.");
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await apiRequest<ApplicationWithJob[]>("/api/applications", { token });
+      setApplications(data);
+      setSelectedApplicationIds((currentIds) =>
+        currentIds.filter((id) => data.some((application) => application.id === id)),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load applications.");
+    } finally {
+      setIsLoading(false);
     }
-
-    void loadApplications();
-
-    return () => {
-      isMounted = false;
-    };
   }, [token]);
+
+  useEffect(() => {
+    void loadApplications();
+  }, [loadApplications]);
 
   const filteredApplications = useMemo(
     () =>
@@ -77,6 +72,57 @@ export function ApplicationTable() {
         : applications.filter((application) => application.status === statusFilter),
     [applications, statusFilter],
   );
+
+  useEffect(() => {
+    setSelectedApplicationIds((currentIds) =>
+      currentIds.filter((id) => filteredApplications.some((application) => application.id === id)),
+    );
+  }, [filteredApplications]);
+
+  const allVisibleSelected =
+    filteredApplications.length > 0 &&
+    filteredApplications.every((application) => selectedApplicationIds.includes(application.id));
+
+  function toggleApplicationSelection(applicationId: number) {
+    setSelectedApplicationIds((currentIds) =>
+      currentIds.includes(applicationId)
+        ? currentIds.filter((id) => id !== applicationId)
+        : [...currentIds, applicationId],
+    );
+    setSuccessMessage(null);
+  }
+
+  function toggleAllVisibleApplications() {
+    setSuccessMessage(null);
+    setSelectedApplicationIds(allVisibleSelected ? [] : filteredApplications.map((application) => application.id));
+  }
+
+  async function handleBulkDelete() {
+    if (!token || selectedApplicationIds.length === 0) {
+      return;
+    }
+
+    const confirmed = window.confirm("Delete selected applications?");
+    if (!confirmed) {
+      return;
+    }
+
+    setIsDeleting(true);
+    setError(null);
+    setSuccessMessage(null);
+    try {
+      const result = await bulkDeleteApplications(selectedApplicationIds, token);
+      setSuccessMessage(
+        `Deleted ${result.deleted_count} selected application${result.deleted_count === 1 ? "" : "s"}.`,
+      );
+      setSelectedApplicationIds([]);
+      await loadApplications();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to delete selected applications.");
+    } finally {
+      setIsDeleting(false);
+    }
+  }
 
   if (isLoading) {
     return <LoadingState label="Loading applications..." />;
@@ -107,6 +153,9 @@ export function ApplicationTable() {
       </div>
 
       {error ? <ErrorState message={error} /> : null}
+      {successMessage ? (
+        <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{successMessage}</p>
+      ) : null}
 
       {filteredApplications.length === 0 ? (
         <EmptyState
@@ -116,10 +165,32 @@ export function ApplicationTable() {
           actionLabel="Analyze Job"
         />
       ) : (
-        <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-4 py-3">
+            <p className="text-sm text-slate-600">
+              {selectedApplicationIds.length} selected
+            </p>
+            <Button
+              disabled={selectedApplicationIds.length === 0 || isDeleting}
+              onClick={handleBulkDelete}
+              variant="secondary"
+            >
+              {isDeleting ? "Deleting..." : "Delete selected"}
+            </Button>
+          </div>
+          <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
           <table className="w-full min-w-[960px] border-collapse text-left text-sm">
             <thead className="bg-slate-50 text-slate-600">
               <tr>
+                <th className="w-12 px-4 py-3 font-medium">
+                  <input
+                    aria-label="Select all visible applications"
+                    checked={allVisibleSelected}
+                    className="h-4 w-4 rounded border-slate-300"
+                    onChange={toggleAllVisibleApplications}
+                    type="checkbox"
+                  />
+                </th>
                 <th className="px-4 py-3 font-medium">Company</th>
                 <th className="px-4 py-3 font-medium">Role</th>
                 <th className="px-4 py-3 font-medium">Location</th>
@@ -133,6 +204,15 @@ export function ApplicationTable() {
             <tbody>
               {filteredApplications.map((application) => (
                 <tr key={application.id} className="border-t border-slate-200 hover:bg-slate-50">
+                  <td className="px-4 py-3">
+                    <input
+                      aria-label={`Select ${application.job.company_name} ${application.job.job_title}`}
+                      checked={selectedApplicationIds.includes(application.id)}
+                      className="h-4 w-4 rounded border-slate-300"
+                      onChange={() => toggleApplicationSelection(application.id)}
+                      type="checkbox"
+                    />
+                  </td>
                   <td className="px-4 py-3 font-medium text-slate-950">
                     <Link href={`/jobs/${application.job.id}`}>{application.job.company_name}</Link>
                   </td>
@@ -165,6 +245,7 @@ export function ApplicationTable() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </section>

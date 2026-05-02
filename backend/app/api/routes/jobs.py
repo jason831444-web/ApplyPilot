@@ -6,6 +6,8 @@ from app.schemas.application import ApplicationRead
 from app.schemas.job import (
     AnalyzeNewJobRequest,
     AnalyzeNewJobResponse,
+    BulkDeleteJobsRequest,
+    BulkDeleteResponse,
     JobCreate,
     JobRead,
     JobUpdate,
@@ -40,6 +42,16 @@ def analyze_new_job(
 def list_jobs(current_user: CurrentUser, db: DbSession) -> list[JobWithApplicationRead]:
     jobs = JobService(db).list_for_user(current_user)
     return [JobWithApplicationRead.model_validate(job) for job in jobs]
+
+
+@router.delete("/bulk", response_model=BulkDeleteResponse)
+def bulk_delete_jobs(
+    payload: BulkDeleteJobsRequest,
+    current_user: CurrentUser,
+    db: DbSession,
+) -> BulkDeleteResponse:
+    deleted_count = JobService(db).bulk_delete_for_user(user=current_user, job_ids=payload.job_ids)
+    return BulkDeleteResponse(deleted_count=deleted_count)
 
 
 @router.get("/{job_id}", response_model=JobWithApplicationRead)

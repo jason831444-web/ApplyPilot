@@ -145,6 +145,10 @@ export type AnalyzeNewJobResponse = {
   analysis: JobAnalysis;
 };
 
+export type BulkDeleteResponse = {
+  deleted_count: number;
+};
+
 export type DistributionItem = {
   label: string;
   count: number;

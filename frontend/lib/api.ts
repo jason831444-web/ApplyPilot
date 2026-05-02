@@ -1,3 +1,5 @@
+import type { BulkDeleteResponse } from "./types";
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api";
 
 type RequestOptions = Omit<RequestInit, "body"> & {
@@ -90,3 +92,19 @@ function normalizeApiPath(path: string): string {
 }
 
 export { API_BASE_URL };
+
+export function bulkDeleteJobs(jobIds: number[], token: string): Promise<BulkDeleteResponse> {
+  return apiRequest<BulkDeleteResponse>("/api/jobs/bulk", {
+    method: "DELETE",
+    token,
+    body: { job_ids: jobIds },
+  });
+}
+
+export function bulkDeleteApplications(applicationIds: number[], token: string): Promise<BulkDeleteResponse> {
+  return apiRequest<BulkDeleteResponse>("/api/applications/bulk", {
+    method: "DELETE",
+    token,
+    body: { application_ids: applicationIds },
+  });
+}
