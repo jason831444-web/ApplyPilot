@@ -42,6 +42,16 @@ def list_applications(current_user: CurrentUser, db: DbSession) -> list[Applicat
     return [to_application_with_job(application) for application in applications]
 
 
+@router.get("/export.csv")
+def export_applications_csv(current_user: CurrentUser, db: DbSession) -> Response:
+    csv_content = ApplicationService(db).export_csv_for_user(current_user.id)
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="applypilot_applications.csv"'},
+    )
+
+
 @router.delete("/bulk", response_model=BulkDeleteResponse)
 def bulk_delete_applications(
     payload: BulkDeleteApplicationsRequest,

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { RecommendationBadge } from "@/components/jobs/RecommendationBadge";
 import { useAuth } from "@/hooks/useAuth";
-import { apiRequest, bulkDeleteApplications } from "@/lib/api";
+import { apiRequest, bulkDeleteApplications, exportApplicationsCsv } from "@/lib/api";
 import { formatTitle } from "@/lib/format";
 import type { ApplicationStatus, ApplicationWithJob } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
@@ -38,6 +38,7 @@ export function ApplicationTable() {
   const [statusFilter, setStatusFilter] = useState<ApplicationStatus | "all">("all");
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -124,6 +125,30 @@ export function ApplicationTable() {
     }
   }
 
+  async function handleExportCsv() {
+    if (!token) {
+      return;
+    }
+
+    setIsExporting(true);
+    setError(null);
+    try {
+      const blob = await exportApplicationsCsv(token);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "applypilot_applications.csv";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to export applications.");
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
   if (isLoading) {
     return <LoadingState label="Loading applications..." />;
   }
@@ -134,6 +159,11 @@ export function ApplicationTable() {
         <PageHeader
           title="Applications"
           description="Your active job-search pipeline across saved and applied roles."
+          action={
+            <Button disabled={isExporting} onClick={handleExportCsv} type="button" variant="secondary">
+              {isExporting ? "Exporting..." : "Export CSV"}
+            </Button>
+          }
         />
         <label className="block space-y-1 text-sm font-medium text-slate-700">
           <span>Status filter</span>

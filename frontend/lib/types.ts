@@ -116,6 +116,8 @@ export type JobAnalysis = {
   missing_preferred_skills: string[];
   missing_technical_skills: string[];
   missing_domain_signals: string[];
+  skill_extraction_confidence: "high" | "medium" | "low";
+  skill_gap_note: string | null;
   new_grad_positive_signals: AnalysisEvidence[];
   new_grad_negative_signals: AnalysisEvidence[];
   authorization_evidence: AnalysisEvidence[];

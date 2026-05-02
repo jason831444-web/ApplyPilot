@@ -10,16 +10,36 @@ function SkillPill({ value, tone }: { value: string; tone: "required" | "preferr
 export function MissingSkills({
   required,
   preferred,
+  skillGapNote,
+  technicalSkillCount,
+  hasDomainSignals = false,
   requiredLabel = "Missing Required",
   preferredLabel = "Missing Preferred",
 }: {
   required: string[];
   preferred: string[];
+  skillGapNote?: string | null;
+  technicalSkillCount?: number;
+  hasDomainSignals?: boolean;
   requiredLabel?: string;
   preferredLabel?: string;
 }) {
   if (required.length === 0 && preferred.length === 0) {
-    return <p className="text-sm text-slate-600">No missing skills were detected from the extracted job requirements.</p>;
+    if ((technicalSkillCount ?? 0) <= 2) {
+      return (
+        <p className="text-sm text-amber-800">
+          {skillGapNote || "Limited structured technical requirements detected. Skill gap analysis may be incomplete."}
+        </p>
+      );
+    }
+    if (hasDomainSignals) {
+      return (
+        <p className="text-sm text-slate-600">
+          No missing technical skills were detected, but domain/context signals may still require preparation.
+        </p>
+      );
+    }
+    return <p className="text-sm text-slate-600">No missing technical skills were detected from the extracted job requirements.</p>;
   }
 
   return (

@@ -112,3 +112,22 @@ export function bulkDeleteApplications(applicationIds: number[], token: string):
 export function getResumeTailoring(jobId: number | string, token: string): Promise<ResumeTailoring> {
   return apiRequest<ResumeTailoring>(`/api/jobs/${jobId}/resume-tailoring`, { token });
 }
+
+export async function exportApplicationsCsv(token: string): Promise<Blob> {
+  const response = await fetch(`${normalizeApiBaseUrl(API_BASE_URL)}${normalizeApiPath("/api/applications/export.csv")}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!response.ok) {
+    const fallback = `CSV export failed with status ${response.status}`;
+    let payload: unknown;
+    try {
+      payload = isJsonResponse(response) ? await response.json() : await response.text();
+    } catch {
+      throw new Error(fallback);
+    }
+    throw new Error(getApiErrorMessage(payload, fallback));
+  }
+
+  return response.blob();
+}

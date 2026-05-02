@@ -54,6 +54,16 @@ function CollapsibleSection({
 }
 
 export function JobAnalysisView({ analysis }: { analysis: JobAnalysis }) {
+  const technicalSkills = analysis.technical_skills ?? [...analysis.required_skills, ...analysis.preferred_skills];
+  const domainSignals = analysis.domain_signals ?? [];
+  const concerns = [...analysis.concerns];
+  if (analysis.skill_extraction_confidence === "low") {
+    const confidenceConcern = "Skill matching confidence is limited because the posting does not list clean technical requirements.";
+    if (!concerns.includes(confidenceConcern)) {
+      concerns.unshift(confidenceConcern);
+    }
+  }
+
   return (
     <div className="space-y-5">
       <div className="rounded-md border border-slate-200 bg-white p-5">
@@ -112,13 +122,13 @@ export function JobAnalysisView({ analysis }: { analysis: JobAnalysis }) {
           <div>
             <h4 className="text-sm font-semibold text-slate-900">Technical Skills</h4>
             <div className="mt-2">
-              <PillList values={analysis.technical_skills ?? [...analysis.required_skills, ...analysis.preferred_skills]} emptyText="No technical skills detected." />
+              <PillList values={technicalSkills} emptyText="No technical skills detected." />
             </div>
           </div>
           <div>
             <h4 className="text-sm font-semibold text-slate-900">Domain Signals</h4>
             <div className="mt-2">
-              <PillList values={analysis.domain_signals ?? []} emptyText="No domain signals detected." />
+              <PillList values={domainSignals} emptyText="No domain signals detected." />
             </div>
           </div>
         </div>
@@ -126,6 +136,9 @@ export function JobAnalysisView({ analysis }: { analysis: JobAnalysis }) {
           <MissingSkills
             required={analysis.missing_technical_skills ?? analysis.missing_required_skills}
             preferred={analysis.missing_domain_signals ?? []}
+            skillGapNote={analysis.skill_gap_note}
+            technicalSkillCount={technicalSkills.length}
+            hasDomainSignals={domainSignals.length > 0}
             requiredLabel="Missing Technical Skills"
             preferredLabel="Missing Domain Signals"
           />
@@ -140,7 +153,7 @@ export function JobAnalysisView({ analysis }: { analysis: JobAnalysis }) {
           </div>
         </section>
         <CollapsibleSection title="Concerns">
-          <TextList values={analysis.concerns} emptyText="No concerns detected." />
+          <TextList values={concerns} emptyText="No concerns detected." />
         </CollapsibleSection>
       </div>
 

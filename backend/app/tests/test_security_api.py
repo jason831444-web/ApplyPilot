@@ -1,4 +1,6 @@
 from datetime import timedelta
+import csv
+from io import StringIO
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -322,3 +324,38 @@ def test_resume_tailoring_uses_matched_skills_and_cautions_without_claiming_miss
     assert "kubernetes" not in bullet_text
     assert "do not claim" in caution_text
     assert "work authorization" in caution_text or "sponsorship" in caution_text
+
+
+def test_application_csv_export_requires_auth() -> None:
+    response = client.get("/api/applications/export.csv")
+
+    assert response.status_code == 401
+
+
+def test_application_csv_export_is_user_scoped_and_includes_analysis_columns() -> None:
+    owner_token = register_and_login("csv-owner")
+    other_token = register_and_login("csv-other")
+    update_profile_for_tailoring(owner_token)
+    owner_job_id, owner_application_id = create_analyzed_job(owner_token)
+    other_job_id = create_job(other_token)
+    other_application_response = client.post(
+        "/api/applications",
+        headers=auth_headers(other_token),
+        json={"job_id": other_job_id, "status": "saved"},
+    )
+    assert other_application_response.status_code == 201
+
+    response = client.get("/api/applications/export.csv", headers=auth_headers(owner_token))
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/csv")
+    assert "applypilot_applications.csv" in response.headers["content-disposition"]
+    rows = list(csv.DictReader(StringIO(response.text)))
+    assert len(rows) == 1
+    assert rows[0]["application_id"] == str(owner_application_id)
+    assert rows[0]["job_id"] == str(owner_job_id)
+    assert rows[0]["company_name"] == "Analysis Corp"
+    assert "recommendation" in rows[0]
+    assert rows[0]["overall_score"]
+    assert rows[0]["new_grad_fit_label"]
+    assert rows[0]["authorization_risk"]

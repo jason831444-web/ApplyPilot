@@ -96,6 +96,28 @@ class JobAnalysisRead(BaseModel):
     def missing_domain_signals(self) -> list[str]:
         return []
 
+    @computed_field
+    @property
+    def skill_extraction_confidence(self) -> str:
+        technical_skill_count = len(self.technical_skills)
+        if technical_skill_count <= 1:
+            return "low"
+        if technical_skill_count == 2:
+            return "medium"
+        return "high"
+
+    @computed_field
+    @property
+    def skill_gap_note(self) -> str | None:
+        technical_skill_count = len(self.technical_skills)
+        if technical_skill_count == 0:
+            return "No structured technical requirements were detected, so skill gap analysis may be incomplete."
+        if technical_skill_count == 1:
+            return "Only one technical requirement was detected, so missing-skill analysis may be incomplete."
+        if technical_skill_count == 2:
+            return "Only a small number of technical requirements were detected."
+        return None
+
     model_config = {"from_attributes": True}
 
 
