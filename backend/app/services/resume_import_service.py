@@ -24,10 +24,28 @@ TECHNICAL_SKILL_ALIASES = {
     "Spring Boot": [r"\bspring boot\b"],
     "GitHub": [r"\bgithub\b"],
     "Visual Studio Code": [r"\bvisual studio code\b", r"\bvscode\b"],
-    "Microsoft Excel": [r"\bmicrosoft excel\b", r"\bexcel\b"],
 }
 
 NON_TECHNICAL_SKILLS = {"English", "Korean"}
+
+PROJECT_FRAGMENT_STARTS = (
+    "and ",
+    "a multi-stage",
+    "product-facing",
+    "backend persistence",
+    "job saving",
+    "developed",
+    "implemented",
+    "designed",
+    "integrated",
+    "improved",
+    "conducted",
+    "evaluated",
+    "visualized",
+    "built",
+    "created",
+    "used",
+)
 
 
 class ResumeImportService:
@@ -68,12 +86,35 @@ def normalize_resume_text(text: str) -> str:
     replacements = {
         r"\bE\s+D\s+U\s+C\s+A\s+T\s+I\s+O\s+N\b": "EDUCATION",
         r"\bT\s+E\s+C\s+H\s+N\s+I\s+C\s+A\s+L\s+S\s+K\s+I\s+L\s+L\s+S\b": "TECHNICAL SKILLS",
+        r"\bW\s+O\s+R\s+K\s+E\s+X\s+P\s+E\s+R\s+I\s+E\s+N\s+C\s+E\s*&\s*P\s+R\s+O\s+J\s+E\s+C\s+T\s+S\b": "WORK EXPERIENCE & PROJECTS",
         r"\bP\s+R\s+O\s+J\s+E\s+C\s+T\s+S\b": "PROJECTS",
         r"\bC\s+A\s+M\s+P\s+U\s+S\s+I\s+N\s+V\s+O\s+L\s+V\s+E\s+M\s+E\s+N\s+T\b": "CAMPUS INVOLVEMENT",
     }
     for pattern, replacement in replacements.items():
         normalized = re.sub(pattern, replacement, normalized, flags=re.IGNORECASE)
-    return "\n".join(line.strip() for line in normalized.splitlines() if line.strip())
+
+    output: list[str] = []
+    for raw_line in normalized.splitlines():
+        line = clean_whitespace(raw_line)
+        if not line:
+            continue
+
+        heading = heading_from_line(line)
+        if heading:
+            append_line(output, heading)
+            continue
+
+        line = normalize_bullet_line(line)
+        if is_bullet_line(line):
+            append_line(output, line)
+            continue
+
+        if not output or should_start_new_line(output[-1], line):
+            append_line(output, line)
+        else:
+            output[-1] = f"{output[-1]} {line}".strip()
+
+    return "\n".join(output)
 
 
 def split_resume_sections(text: str) -> dict[str, str]:
@@ -121,11 +162,13 @@ def extract_project_names(text: str) -> list[str]:
 
     projects: list[str] = []
     for line in section.splitlines():
-        clean_line = clean_project_line(line)
-        if not clean_line or is_non_project_line(clean_line):
+        if is_bullet_line(line):
             continue
+        clean_line = clean_project_line(line)
         if "|" in clean_line:
             clean_line = clean_line.split("|", 1)[0].strip()
+        if not clean_line or is_non_project_line(clean_line):
+            continue
         if looks_like_project_title(clean_line):
             projects.append(clean_line[:180])
     if projects:
@@ -164,6 +207,60 @@ def build_experience_summary(text: str, skills: list[str], projects: list[str]) 
     return summary[:600]
 
 
+def clean_whitespace(value: str) -> str:
+    return re.sub(r"\s+", " ", value.strip())
+
+
+def append_line(output: list[str], line: str) -> None:
+    if line:
+        output.append(line)
+
+
+def heading_from_line(line: str) -> str | None:
+    compact = re.sub(r"[^A-Za-z&]", "", line).upper()
+    heading_map = {
+        "EDUCATION": "EDUCATION",
+        "WORKEXPERIENCE": "WORK EXPERIENCE",
+        "WORKEXPERIENCE&PROJECTS": "WORK EXPERIENCE & PROJECTS",
+        "PROJECTS": "PROJECTS",
+        "CAMPUSINVOLVEMENT": "CAMPUS INVOLVEMENT",
+        "TECHNICALSKILLS": "TECHNICAL SKILLS",
+        "SKILLS": "SKILLS",
+    }
+    return heading_map.get(compact)
+
+
+def normalize_bullet_line(line: str) -> str:
+    return re.sub(r"^\s*[-*•●▪]\s*", "- ", line).strip()
+
+
+def is_bullet_line(line: str) -> bool:
+    return bool(re.match(r"^\s*[-*•●▪]\s+", line))
+
+
+def should_start_new_line(previous: str, current: str) -> bool:
+    if heading_from_line(previous):
+        return True
+    if is_bullet_line(previous):
+        return True
+    if is_project_title_row(previous) or is_project_title_row(current):
+        return True
+    if re.match(r"^[A-Z][A-Za-z /&.-]+:\s", current):
+        return True
+    if re.search(r"[.!?)]$", previous) and len(current.split()) > 3:
+        return True
+    if len(current.split()) <= 3:
+        return False
+    return False
+
+
+def is_project_title_row(line: str) -> bool:
+    if "|" not in line or is_bullet_line(line):
+        return False
+    title = clean_project_line(line.split("|", 1)[0])
+    return looks_like_project_title(title)
+
+
 def canonical_heading(value: str) -> str:
     return re.sub(r"\s+", " ", value.strip().upper().replace(" AND ", " & "))
 
@@ -173,9 +270,18 @@ def clean_project_line(line: str) -> str:
 
 
 def looks_like_project_title(line: str) -> bool:
+    stripped = line.strip()
+    if not stripped or stripped[0].islower():
+        return False
+    if stripped.lower().startswith(PROJECT_FRAGMENT_STARTS):
+        return False
     if len(line.split()) > 14:
         return False
-    if re.search(r"\b(built|developed|implemented|designed|created|used|analyzed|integrated)\b", line, re.IGNORECASE):
+    if re.search(
+        r"^(built|developed|implemented|designed|created|used|analyzed|integrated|improved|conducted|evaluated|visualized)\b",
+        line,
+        re.IGNORECASE,
+    ):
         return False
     return bool(re.search(r"[A-Za-z]{3,}", line))
 

@@ -440,7 +440,16 @@ def test_resume_import_section_parser_extracts_clean_projects_and_technical_skil
 
     E DUCATION
     Rutgers University, B.S. Computer Science
-    Coursework: Data Structures, Algorithms
+    Relevant Coursework:
+    Data Structures, Foundations of Computer Science, Programming
+    Abstractions,
+    Systems
+    Fundamentals
+    I
+    &
+    II,
+    Software
+    Development
 
     WORK EXPERIENCE & PROJECTS
     Teaching Assistant | Rutgers University
@@ -448,12 +457,15 @@ def test_resume_import_section_parser_extracts_clean_projects_and_technical_skil
 
     PROJECTS
     DocuParse – AI-Powered Document Understanding System | FastAPI, Next.js, PostgreSQL, Docker
-    - Built document parsing workflows.
+    - a multi-stage processing pipeline for document parsing workflows.
     Smart Seat & Facility Congestion Analysis System | Python, Computer Vision
-    - Implemented congestion analysis.
+    - product-facing features for facility congestion analysis.
     ApplyPilot – Rule-Based Job-Fit Evaluation Platform | FastAPI, React, PostgreSQL
-    Student Academic Management System (SAM) | Spring Boot, MySQL
-    CNN vs. SNN Image Classification Comparison | Python, Machine Learning
+    - backend persistence and job saving for analyzed applications.
+    Student Academic Management System (SAM) | Spring Boot, MySQL, React, GitHub Actions
+    - developed academic management workflows.
+    CNN vs. SNN Image Classification Comparison | Python, NumPy, PyTorch, Matplotlib
+    - and tested a 3-layer Spiking Neural Network.
 
     TECHNICAL SKILLS
     Technical Languages: C, Java, Python, HTML, CSS, JavaScript, SQL
@@ -469,11 +481,22 @@ def test_resume_import_section_parser_extracts_clean_projects_and_technical_skil
     summary = build_experience_summary(normalized, skills, projects)
 
     assert len(summary) <= 600
-    assert any(project.startswith("DocuParse") for project in projects)
-    assert any(project.startswith("Smart Seat") for project in projects)
-    assert any(project.startswith("ApplyPilot") for project in projects)
+    assert "Systems\nFundamentals\nI\n&\nII" not in normalized
+    assert "Systems Fundamentals I & II, Software Development" in normalized
+    assert "DocuParse – AI-Powered Document Understanding System" in projects
+    assert "Smart Seat & Facility Congestion Analysis System" in projects
+    assert "ApplyPilot – Rule-Based Job-Fit Evaluation Platform" in projects
+    assert "Student Academic Management System (SAM)" in projects
+    assert "CNN vs. SNN Image Classification Comparison" in projects
     assert not any("jae@example.com" in project.lower() for project in projects)
     assert not any("Rutgers University" in project for project in projects)
+    assert not any("and tested a 3-layer Spiking Neural Network" in project for project in projects)
+    assert not any("a multi-stage processing pipeline" in project for project in projects)
+    assert not any("product-facing features" in project for project in projects)
+    assert not any("backend persistence" in project for project in projects)
+    assert not any("job saving" in project for project in projects)
+    assert "and tested a 3-layer Spiking Neural Network" not in summary
+    assert "a multi-stage processing pipeline" not in summary
     assert {"React", "Next.js", "FastAPI", "PostgreSQL", "Docker"} <= set(skills)
     assert "Korean" not in skills
     assert "English" not in skills

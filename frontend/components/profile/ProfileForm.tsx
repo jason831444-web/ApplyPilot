@@ -31,6 +31,22 @@ function joinLineList(value: string[]): string {
   return value.join("\n");
 }
 
+function isCleanProjectSuggestion(value: string): boolean {
+  const trimmed = value.trim();
+  const lower = trimmed.toLowerCase();
+  if (!trimmed || trimmed.length > 180 || trimmed.startsWith("-")) {
+    return false;
+  }
+  if (
+    /^(and |a multi-stage|product-facing|backend persistence|job saving|developed|implemented|designed|integrated|improved|conducted|evaluated|visualized|built|created|used)/i.test(
+      trimmed,
+    )
+  ) {
+    return false;
+  }
+  return !/(email|coursework|university|gpa|linkedin\.com|@)/i.test(lower);
+}
+
 export function ProfileForm() {
   const { token } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -172,14 +188,15 @@ export function ProfileForm() {
       if (result.skills_suggestions.length > 0) {
         setSkillsInput(joinCommaList(result.skills_suggestions));
       }
-      if (result.projects_suggestions.length > 0) {
-        setProjectsInput(joinLineList(result.projects_suggestions));
+      const cleanProjects = result.projects_suggestions.filter(isCleanProjectSuggestion);
+      if (cleanProjects.length > 0) {
+        setProjectsInput(joinLineList(cleanProjects));
       }
       if (result.experience_summary_suggestion) {
         setExperienceSummary(result.experience_summary_suggestion);
       }
       setSuccess(
-        `Imported ${result.skills_suggestions.length} skills and ${result.projects_suggestions.length} projects from your resume. Review the suggestions, then save your profile.`,
+        `Imported ${result.skills_suggestions.length} skills and ${cleanProjects.length} projects from your resume. Review the suggestions, then save your profile.`,
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to import resume.");
