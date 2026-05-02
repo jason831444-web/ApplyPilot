@@ -1,4 +1,4 @@
-import type { BulkDeleteResponse } from "./types";
+import type { BulkDeleteResponse, ResumeTailoring } from "./types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api";
 
@@ -107,4 +107,8 @@ export function bulkDeleteApplications(applicationIds: number[], token: string):
     token,
     body: { application_ids: applicationIds },
   });
+}
+
+export function getResumeTailoring(jobId: number | string, token: string): Promise<ResumeTailoring> {
+  return apiRequest<ResumeTailoring>(`/api/jobs/${jobId}/resume-tailoring`, { token });
 }

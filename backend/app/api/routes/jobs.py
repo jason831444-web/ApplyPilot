@@ -13,7 +13,9 @@ from app.schemas.job import (
     JobUpdate,
     JobWithApplicationRead,
 )
+from app.schemas.resume_tailoring import ResumeTailoringRead
 from app.services.job_service import JobService
+from app.services.resume_tailoring_service import ResumeTailoringService
 
 router = APIRouter()
 
@@ -87,3 +89,8 @@ def analyze_job(job_id: int, current_user: CurrentUser, db: DbSession) -> JobAna
 def read_job_analysis(job_id: int, current_user: CurrentUser, db: DbSession) -> JobAnalysisRead:
     analysis = JobService(db).get_analysis_for_user(user=current_user, job_id=job_id)
     return JobAnalysisRead.model_validate(analysis)
+
+
+@router.get("/{job_id}/resume-tailoring", response_model=ResumeTailoringRead)
+def read_resume_tailoring(job_id: int, current_user: CurrentUser, db: DbSession) -> ResumeTailoringRead:
+    return ResumeTailoringService(db).generate_for_user(user=current_user, job_id=job_id)

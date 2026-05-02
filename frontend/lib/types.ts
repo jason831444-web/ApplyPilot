@@ -149,6 +149,15 @@ export type BulkDeleteResponse = {
   deleted_count: number;
 };
 
+export type ResumeTailoring = {
+  tailored_summary: string;
+  bullet_suggestions: string[];
+  keywords_to_add: string[];
+  skills_to_emphasize: string[];
+  project_suggestions: string[];
+  cautions: string[];
+};
+
 export type DistributionItem = {
   label: string;
   count: number;

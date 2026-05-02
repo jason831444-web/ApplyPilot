@@ -6,10 +6,11 @@ import { ApplicationEditor } from "@/components/applications/ApplicationEditor";
 import { Button } from "@/components/ui/Button";
 import { ErrorState, LoadingState } from "@/components/ui/State";
 import { useAuth } from "@/hooks/useAuth";
-import { apiRequest } from "@/lib/api";
+import { apiRequest, getResumeTailoring } from "@/lib/api";
 import { formatTitle } from "@/lib/format";
-import type { Application, Job, JobAnalysis } from "@/lib/types";
+import type { Application, Job, JobAnalysis, ResumeTailoring } from "@/lib/types";
 import { JobAnalysisView } from "./JobAnalysisView";
+import { ResumeTailoringView } from "./ResumeTailoringView";
 
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
@@ -28,38 +29,55 @@ export function JobDetailView({ jobId }: { jobId: string }) {
   const [job, setJob] = useState<Job | null>(null);
   const [application, setApplication] = useState<Application | null>(null);
   const [analysis, setAnalysis] = useState<JobAnalysis | null>(null);
+  const [resumeTailoring, setResumeTailoring] = useState<ResumeTailoring | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [tailoringError, setTailoringError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) {
       return;
     }
 
+    const authToken = token;
     let isMounted = true;
 
     async function loadJob() {
       setIsLoading(true);
       setError(null);
       try {
-        const data = await apiRequest<Job>(`/api/jobs/${jobId}`, { token });
+        const data = await apiRequest<Job>(`/api/jobs/${jobId}`, { token: authToken });
         if (isMounted) {
           setJob(data);
           setApplication(data.application ?? null);
           setAnalysis(data.analysis ?? null);
         }
         try {
-          const analysisData = await apiRequest<JobAnalysis>(`/api/jobs/${jobId}/analysis`, { token });
+          const analysisData = await apiRequest<JobAnalysis>(`/api/jobs/${jobId}/analysis`, { token: authToken });
           if (isMounted) {
             setAnalysis(analysisData);
             setAnalysisError(null);
+          }
+          try {
+            const tailoringData = await getResumeTailoring(jobId, authToken);
+            if (isMounted) {
+              setResumeTailoring(tailoringData);
+              setTailoringError(null);
+            }
+          } catch (err) {
+            if (isMounted) {
+              setResumeTailoring(null);
+              setTailoringError(getReadableError(err, "Unable to load resume tailoring suggestions."));
+            }
           }
         } catch (err) {
           if (isMounted) {
             const message = getReadableError(err, "Something went wrong.");
             setAnalysisError(isNotFoundMessage(message) ? null : message);
+            setResumeTailoring(null);
+            setTailoringError(null);
           }
         }
       } catch (err) {
@@ -95,6 +113,14 @@ export function JobDetailView({ jobId }: { jobId: string }) {
         token,
       });
       setAnalysis(data);
+      try {
+        const tailoringData = await getResumeTailoring(jobId, token);
+        setResumeTailoring(tailoringData);
+        setTailoringError(null);
+      } catch (err) {
+        setResumeTailoring(null);
+        setTailoringError(getReadableError(err, "Unable to load resume tailoring suggestions."));
+      }
     } catch (err) {
       setAnalysisError(getReadableError(err, "Something went wrong."));
     } finally {
@@ -179,6 +205,19 @@ export function JobDetailView({ jobId }: { jobId: string }) {
           </div>
         )}
       </div>
+
+      {analysis ? (
+        resumeTailoring ? (
+          <ResumeTailoringView tailoring={resumeTailoring} />
+        ) : (
+          <div className="rounded-md border border-slate-200 bg-white p-5">
+            <h2 className="text-lg font-semibold">Resume Tailoring Suggestions</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              {tailoringError || "Resume tailoring suggestions are not available yet."}
+            </p>
+          </div>
+        )
+      ) : null}
 
       <ApplicationEditor
         jobId={job.id}

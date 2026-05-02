@@ -70,6 +70,24 @@ def create_analyzed_job(token: str) -> tuple[int, int]:
     return data["job"]["id"], data["application"]["id"]
 
 
+def update_profile_for_tailoring(token: str) -> None:
+    response = client.put(
+        "/api/profile/me",
+        headers=auth_headers(token),
+        json={
+            "resume_text": "Computer Science new grad with React, Next.js, Python, FastAPI, PostgreSQL, Docker, AWS, and machine learning experience.",
+            "skills": ["React", "Next.js", "Python", "FastAPI", "PostgreSQL", "Docker", "AWS", "REST API"],
+            "projects": ["ApplyPilot job-fit decision engine", "DocuParse OCR document parser"],
+            "experience_summary": "Built backend APIs, dashboards, OCR workflows, and production-minded full-stack projects.",
+            "target_roles": ["Software Engineer", "Backend Engineer"],
+            "target_locations": ["Remote", "New York"],
+            "graduation_date": "2026-05-20",
+            "work_authorization_notes": "F-1 OPT candidate. May require future H-1B sponsorship.",
+        },
+    )
+    assert response.status_code == 200
+
+
 def test_protected_routes_require_auth() -> None:
     for path in ["/api/profile/me", "/api/jobs", "/api/applications", "/api/dashboard/summary"]:
         response = client.get(path)
@@ -242,3 +260,65 @@ def test_bulk_delete_rejects_empty_id_lists() -> None:
 
     assert jobs_response.status_code == 422
     assert applications_response.status_code == 422
+
+
+def test_resume_tailoring_requires_auth() -> None:
+    response = client.get("/api/jobs/1/resume-tailoring")
+
+    assert response.status_code == 401
+
+
+def test_resume_tailoring_returns_404_without_analysis() -> None:
+    token = register_and_login("tailoring-no-analysis")
+    job_id = create_job(token)
+
+    response = client.get(f"/api/jobs/{job_id}/resume-tailoring", headers=auth_headers(token))
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Run job analysis before generating resume tailoring suggestions."
+
+
+def test_user_cannot_access_another_users_resume_tailoring() -> None:
+    owner_token = register_and_login("tailoring-owner")
+    other_token = register_and_login("tailoring-other")
+    update_profile_for_tailoring(owner_token)
+    job_id, _application_id = create_analyzed_job(owner_token)
+
+    response = client.get(f"/api/jobs/{job_id}/resume-tailoring", headers=auth_headers(other_token))
+
+    assert response.status_code == 404
+
+
+def test_resume_tailoring_uses_matched_skills_and_cautions_without_claiming_missing_skills() -> None:
+    token = register_and_login("tailoring-match")
+    update_profile_for_tailoring(token)
+    response = client.post(
+        "/api/jobs/analyze-new",
+        headers=auth_headers(token),
+        json={
+            "company_name": "Tailor Corp",
+            "job_title": "Backend Software Engineer",
+            "location": "Remote",
+            "job_description": (
+                "Requirements: Python, FastAPI, PostgreSQL, REST API, Docker, Kubernetes. "
+                "Preferred qualifications: AWS, React. Must be comfortable with high degree of ownership."
+            ),
+            "source_url": None,
+            "source_type": "manual",
+        },
+    )
+    assert response.status_code == 201
+    job_id = response.json()["job"]["id"]
+
+    tailoring_response = client.get(f"/api/jobs/{job_id}/resume-tailoring", headers=auth_headers(token))
+
+    assert tailoring_response.status_code == 200
+    data = tailoring_response.json()
+    bullet_text = " ".join(data["bullet_suggestions"]).lower()
+    caution_text = " ".join(data["cautions"]).lower()
+    assert "Python" in data["skills_to_emphasize"]
+    assert "FastAPI" in data["skills_to_emphasize"]
+    assert "Kubernetes" in data["keywords_to_add"]
+    assert "kubernetes" not in bullet_text
+    assert "do not claim" in caution_text
+    assert "work authorization" in caution_text or "sponsorship" in caution_text
