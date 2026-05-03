@@ -30,10 +30,17 @@ NON_TECHNICAL_SKILLS = {"English", "Korean"}
 
 PROJECT_FRAGMENT_STARTS = (
     "and ",
+    "a ",
+    "ai inference",
     "a multi-stage",
+    "fallback routing",
     "product-facing",
     "backend persistence",
     "job saving",
+    "profile using",
+    "structured rules",
+    "missing-skill detection",
+    "application status tracking",
     "developed",
     "implemented",
     "designed",
@@ -186,7 +193,7 @@ def extract_project_names(text: str) -> list[str]:
             clean_line = clean_line.split("|", 1)[0].strip()
         if not clean_line or is_non_project_line(clean_line):
             continue
-        if (had_pipe or len(clean_line.split()) >= 2) and looks_like_project_title(clean_line):
+        if is_valid_project_title_candidate(clean_line, had_pipe=had_pipe):
             projects.append(clean_line[:180])
     projects.extend(extract_project_titles_from_text(section))
     if projects:
@@ -205,7 +212,7 @@ def fallback_project_names(text: str) -> list[str]:
         if not match:
             continue
         candidate = clean_project_line(match.group(1))
-        if looks_like_project_title(candidate) and not is_non_project_line(candidate):
+        if (is_valid_project_title_candidate(candidate) or looks_like_single_project_name(candidate)) and not is_non_project_line(candidate):
             projects.append(candidate[:180])
     return unique(projects)
 
@@ -242,7 +249,6 @@ def split_inline_section_heading(line: str) -> list[str]:
         ("WORK EXPERIENCE", r"work\s+experience"),
         ("EDUCATION", r"education"),
         ("PROJECTS", r"projects"),
-        ("SKILLS", r"skills"),
     ]
     for heading, pattern in heading_patterns:
         match = re.match(rf"^\s*({pattern})\s*:?\s+(.+)$", clean_line, flags=re.IGNORECASE)
@@ -301,11 +307,19 @@ def is_project_title_row(line: str) -> bool:
     return looks_like_project_title(title)
 
 
+def is_valid_project_title_candidate(candidate: str, *, had_pipe: bool = False) -> bool:
+    if not looks_like_project_title(candidate):
+        return False
+    if had_pipe or " – " in candidate:
+        return True
+    return has_title_case_project_pattern(candidate)
+
+
 def extract_project_titles_from_text(text: str) -> list[str]:
     titles: list[str] = []
     for match in re.finditer(r"\|", text):
         title = best_project_title_before_pipe(text[: match.start()])
-        if len(title.split()) >= 2 and looks_like_project_title(title) and not is_non_project_line(title):
+        if is_valid_project_title_candidate(title, had_pipe=True) and not is_non_project_line(title):
             titles.append(title[:180])
     return unique(titles)
 
@@ -349,6 +363,19 @@ def looks_like_project_title(line: str) -> bool:
     ):
         return False
     return bool(re.search(r"[A-Za-z]{3,}", line))
+
+
+def has_title_case_project_pattern(line: str) -> bool:
+    words = re.findall(r"\b[A-Za-z][A-Za-z.()&+-]*\b", line)
+    title_like_words = [word for word in words if word[:1].isupper() or word.isupper()]
+    return len(title_like_words) >= 3 and len(words) <= 10
+
+
+def looks_like_single_project_name(line: str) -> bool:
+    stripped = line.strip()
+    if not stripped or " " in stripped or stripped.lower().startswith(PROJECT_FRAGMENT_STARTS):
+        return False
+    return bool(re.match(r"^[A-Z][A-Za-z0-9]+$", stripped))
 
 
 def is_non_project_line(line: str) -> bool:

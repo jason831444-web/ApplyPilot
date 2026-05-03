@@ -514,13 +514,13 @@ def test_resume_import_handles_inline_projects_heading_and_rejects_fragments() -
     PROJECTS DocuParse – AI-Powered Document Understanding System | FastAPI, Next.js, PostgreSQL,
     Docker
     - a multi-stage processing pipeline for OCR and document parsing.
+    AI inference with fallback routing across multiple document formats
     Smart Seat & Facility Congestion Analysis System | Next.js, FastAPI, PostgreSQL, Docker
     - product-facing features for facility congestion analysis.
-    ApplyPilot – Rule-Based Job-Fit Evaluation Platform | Next.js, FastAPI, PostgreSQL, Docker
+    ApplyPilot – Rule-Based Job-Fit Evaluation Platform | Next.js, FastAPI, PostgreSQL, Docker - Built profile using structured rules for new-grad fit, skills, location, and work authorization risk.
     - backend persistence and job saving for analyzed applications.
-    Student Academic Management System (SAM) | Spring Boot, MySQL, React, GitHub Actions
-    - developed management workflows.
-    CNN vs. SNN Image Classification Comparison | Python, NumPy, PyTorch, Matplotlib
+    Student Academic Management System (SAM) | Spring Boot, MySQL, React, GitHub Actions - Developed management workflows.
+    CNN vs. SNN Image Classification Comparison | Python, NumPy, PyTorch, Matplotlib - Conducted image classification experiments.
     - and tested a 3-layer Spiking Neural Network.
 
     TECHNICAL SKILLS Technical Languages: C, Java, Python, HTML, CSS, JavaScript, SQL
@@ -536,6 +536,8 @@ def test_resume_import_handles_inline_projects_heading_and_rejects_fragments() -
 
     assert "PROJECTS\nDocuParse" in normalized
     assert "TECHNICAL SKILLS\nTechnical Languages" in normalized
+    assert "profile using structured rules for new-grad fit, SKILLS location" not in normalized
+    assert "profile using structured rules for new-grad fit, skills, location" in normalized
     assert projects == [
         "DocuParse – AI-Powered Document Understanding System",
         "Smart Seat & Facility Congestion Analysis System",
@@ -544,6 +546,15 @@ def test_resume_import_handles_inline_projects_heading_and_rejects_fragments() -
         "CNN vs. SNN Image Classification Comparison",
     ]
     assert len(projects) == 5
+    assert "AI inference with fallback routing across multiple document formats" not in projects
     assert "Built projects including DocuParse" in summary
-    for fragment in ["and tested a 3", "a multi", "product", "backend persistence", "job saving"]:
+    for fragment in [
+        "AI inference",
+        "fallback routing",
+        "and tested a 3",
+        "a multi",
+        "product",
+        "backend persistence",
+        "job saving",
+    ]:
         assert fragment not in summary
