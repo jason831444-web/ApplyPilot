@@ -65,6 +65,16 @@ SUMMARY_SKILL_PRIORITY = [
     "SQL",
 ]
 
+MODEL_OR_LIBRARY_PROJECT_NAMES = {
+    "spiking neural network",
+    "spiking neural network (snn)",
+    "resnet",
+    "yolo",
+    "pytorch",
+    "numpy",
+    "matplotlib",
+}
+
 
 class ResumeImportService:
     async def parse_upload(self, file: UploadFile) -> ResumeImportRead:
@@ -312,6 +322,10 @@ def is_project_title_row(line: str) -> bool:
 def is_valid_project_title_candidate(candidate: str, *, had_pipe: bool = False) -> bool:
     if not looks_like_project_title(candidate):
         return False
+    if is_model_or_library_name(candidate):
+        return False
+    if not had_pipe and len(meaningful_words(candidate)) < 3 and candidate != "ApplyPilot":
+        return False
     if had_pipe or " – " in candidate:
         return True
     return has_title_case_project_pattern(candidate)
@@ -319,13 +333,13 @@ def is_valid_project_title_candidate(candidate: str, *, had_pipe: bool = False) 
 
 def extract_project_titles_from_text(text: str) -> list[str]:
     titles: list[str] = []
-    title_before_pipe_pattern = re.compile(r"(?P<title>[A-Z][A-Za-z0-9 .()&–-]{2,100}?)\s*\|")
+    title_before_pipe_pattern = re.compile(r"(?P<title>(?:^|\n)[^\n|]{3,100}?)\s+\|\s+")
     for match in title_before_pipe_pattern.finditer(text):
         title = best_project_title_from_segment(match.group("title"))
         if is_valid_project_title_candidate(title, had_pipe=True) and not is_non_project_line(title):
             titles.append(title[:180])
 
-    for match in re.finditer(r"\|", text):
+    for match in re.finditer(r"\s+\|\s+", text):
         title = best_project_title_before_pipe(text[: match.start()])
         if is_valid_project_title_candidate(title, had_pipe=True) and not is_non_project_line(title):
             titles.append(title[:180])
@@ -381,6 +395,17 @@ def has_title_case_project_pattern(line: str) -> bool:
     words = re.findall(r"\b[A-Za-z][A-Za-z.()&+-]*\b", line)
     title_like_words = [word for word in words if word[:1].isupper() or word.isupper()]
     return len(title_like_words) >= 3 and len(words) <= 10
+
+
+def meaningful_words(line: str) -> list[str]:
+    return re.findall(r"\b[A-Za-z][A-Za-z0-9.+#-]*\b", line)
+
+
+def is_model_or_library_name(line: str) -> bool:
+    normalized = re.sub(r"\s+", " ", line.strip().lower())
+    if normalized in MODEL_OR_LIBRARY_PROJECT_NAMES:
+        return True
+    return bool(re.fullmatch(r"(?:custom\s+\d+[- ]layer\s+)?spiking neural network(?:\s+\(snn\))?", normalized))
 
 
 def looks_like_single_project_name(line: str) -> bool:

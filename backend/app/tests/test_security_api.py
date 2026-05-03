@@ -524,6 +524,7 @@ def test_resume_import_handles_inline_projects_heading_and_rejects_fragments() -
     Student Academic Management System (SAM) | Spring Boot, MySQL, React, GitHub Actions - Developed management workflows.
     CNN vs. SNN Image Classification Comparison | Python, NumPy, PyTorch, Matplotlib - Conducted image classification experiments.
     - and tested a 3-layer Spiking Neural Network.
+    - Built a custom 3-layer Spiking Neural Network (SNN) and compared it with ResNet.
 
     TECHNICAL SKILLS Technical Languages: C, Java, Python, HTML, CSS, JavaScript, SQL
     Frameworks: React, Next.js, Node.js, Express.js, Spring Boot, FastAPI, REST API
@@ -550,6 +551,8 @@ def test_resume_import_handles_inline_projects_heading_and_rejects_fragments() -
     ]
     assert len(projects) == 5
     assert "AI inference with fallback routing across multiple document formats" not in projects
+    assert "Spiking Neural Network (SNN)" not in projects
+    assert "Spiking Neural Network" not in projects
     assert "Built projects including DocuParse" in summary
     assert "Student Academic Management System (SAM)" in summary
     assert "CNN vs. SNN Image Classification Comparison" in summary
