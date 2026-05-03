@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { apiRequest, uploadResume } from "@/lib/api";
+import { apiRequest, uploadResume, reanalyzeAllJobs } from "@/lib/api";
 import type { Profile, ProfileUpdate } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
@@ -148,14 +148,24 @@ export function ProfileForm() {
       return;
     }
 
-    try {
+        try {
       const data = await apiRequest<Profile>("/api/profile/me", {
         method: "PUT",
         token,
         body: payload,
       });
       setProfile(data);
-      setSuccess("Profile saved.");
+
+      try {
+        const result = await reanalyzeAllJobs(token);
+        setSuccess(
+          `Profile saved. Reanalyzed ${result.reanalyzed_count} jobs.${
+            result.failed_count > 0 ? ` ${result.failed_count} failed.` : ""
+          }`,
+        );
+      } catch {
+        setSuccess("Profile saved, but job analyses could not be refreshed.");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to save profile.");
     } finally {

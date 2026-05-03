@@ -155,3 +155,13 @@ export async function uploadResume(file: File, token: string): Promise<ResumeImp
 
   return response.json() as Promise<ResumeImportResult>;
 }
+
+export async function reanalyzeAllJobs(token: string) {
+  return apiRequest<{ reanalyzed_count: number; failed_count: number }>(
+    "/api/jobs/reanalyze-all",
+    {
+      method: "POST",
+      token,
+    },
+  );
+}
