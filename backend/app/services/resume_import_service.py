@@ -263,6 +263,9 @@ def append_line(output: list[str], line: str) -> None:
 
 
 def heading_from_line(line: str) -> str | None:
+    stripped = line.strip()
+    if re.fullmatch(r"(?i)skills:?", stripped):
+        return "SKILLS"
     compact = re.sub(r"[^A-Za-z&]", "", line).upper()
     heading_map = {
         "EDUCATION": "EDUCATION",
@@ -271,7 +274,6 @@ def heading_from_line(line: str) -> str | None:
         "PROJECTS": "PROJECTS",
         "CAMPUSINVOLVEMENT": "CAMPUS INVOLVEMENT",
         "TECHNICALSKILLS": "TECHNICAL SKILLS",
-        "SKILLS": "SKILLS",
     }
     return heading_map.get(compact)
 
@@ -317,6 +319,12 @@ def is_valid_project_title_candidate(candidate: str, *, had_pipe: bool = False) 
 
 def extract_project_titles_from_text(text: str) -> list[str]:
     titles: list[str] = []
+    title_before_pipe_pattern = re.compile(r"(?P<title>[A-Z][A-Za-z0-9 .()&–-]{2,100}?)\s*\|")
+    for match in title_before_pipe_pattern.finditer(text):
+        title = best_project_title_from_segment(match.group("title"))
+        if is_valid_project_title_candidate(title, had_pipe=True) and not is_non_project_line(title):
+            titles.append(title[:180])
+
     for match in re.finditer(r"\|", text):
         title = best_project_title_before_pipe(text[: match.start()])
         if is_valid_project_title_candidate(title, had_pipe=True) and not is_non_project_line(title):
@@ -326,6 +334,10 @@ def extract_project_titles_from_text(text: str) -> list[str]:
 
 def best_project_title_before_pipe(value: str) -> str:
     segment = value.rsplit("\n", 1)[-1].rsplit("|", 1)[-1]
+    return best_project_title_from_segment(segment)
+
+
+def best_project_title_from_segment(segment: str) -> str:
     words = clean_project_line(segment).split()
     for start_index, word in enumerate(words):
         if not word[:1].isupper():

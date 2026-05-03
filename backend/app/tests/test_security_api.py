@@ -517,7 +517,9 @@ def test_resume_import_handles_inline_projects_heading_and_rejects_fragments() -
     AI inference with fallback routing across multiple document formats
     Smart Seat & Facility Congestion Analysis System | Next.js, FastAPI, PostgreSQL, Docker
     - product-facing features for facility congestion analysis.
-    ApplyPilot – Rule-Based Job-Fit Evaluation Platform | Next.js, FastAPI, PostgreSQL, Docker - Built profile using structured rules for new-grad fit, skills, location, and work authorization risk.
+    ApplyPilot – Rule-Based Job-Fit Evaluation Platform | Next.js, FastAPI, PostgreSQL, Docker - Built profile using structured rules for new-grad fit,
+    skills,
+    location, and work authorization risk.
     - backend persistence and job saving for analyzed applications.
     Student Academic Management System (SAM) | Spring Boot, MySQL, React, GitHub Actions - Developed management workflows.
     CNN vs. SNN Image Classification Comparison | Python, NumPy, PyTorch, Matplotlib - Conducted image classification experiments.
@@ -537,7 +539,8 @@ def test_resume_import_handles_inline_projects_heading_and_rejects_fragments() -
     assert "PROJECTS\nDocuParse" in normalized
     assert "TECHNICAL SKILLS\nTechnical Languages" in normalized
     assert "profile using structured rules for new-grad fit, SKILLS location" not in normalized
-    assert "profile using structured rules for new-grad fit, skills, location" in normalized
+    assert "\nSKILLS\nlocation" not in normalized
+    assert "profile using structured rules for new-grad fit,\nskills, location" in normalized
     assert projects == [
         "DocuParse – AI-Powered Document Understanding System",
         "Smart Seat & Facility Congestion Analysis System",
@@ -548,6 +551,8 @@ def test_resume_import_handles_inline_projects_heading_and_rejects_fragments() -
     assert len(projects) == 5
     assert "AI inference with fallback routing across multiple document formats" not in projects
     assert "Built projects including DocuParse" in summary
+    assert "Student Academic Management System (SAM)" in summary
+    assert "CNN vs. SNN Image Classification Comparison" in summary
     for fragment in [
         "AI inference",
         "fallback routing",
