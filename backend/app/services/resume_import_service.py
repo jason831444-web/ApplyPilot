@@ -47,6 +47,17 @@ PROJECT_FRAGMENT_STARTS = (
     "used",
 )
 
+SUMMARY_SKILL_PRIORITY = [
+    "Python",
+    "JavaScript",
+    "React",
+    "Next.js",
+    "FastAPI",
+    "PostgreSQL",
+    "Docker",
+    "SQL",
+]
+
 
 class ResumeImportService:
     async def parse_upload(self, file: UploadFile) -> ResumeImportRead:
@@ -95,26 +106,31 @@ def normalize_resume_text(text: str) -> str:
 
     output: list[str] = []
     for raw_line in normalized.splitlines():
-        line = clean_whitespace(raw_line)
-        if not line:
-            continue
-
-        heading = heading_from_line(line)
-        if heading:
-            append_line(output, heading)
-            continue
-
-        line = normalize_bullet_line(line)
-        if is_bullet_line(line):
-            append_line(output, line)
-            continue
-
-        if not output or should_start_new_line(output[-1], line):
-            append_line(output, line)
-        else:
-            output[-1] = f"{output[-1]} {line}".strip()
+        for line in split_inline_section_heading(raw_line):
+            append_normalized_resume_line(output, line)
 
     return "\n".join(output)
+
+
+def append_normalized_resume_line(output: list[str], raw_line: str) -> None:
+    line = clean_whitespace(raw_line)
+    if not line:
+        return
+
+    heading = heading_from_line(line)
+    if heading:
+        append_line(output, heading)
+        return
+
+    line = normalize_bullet_line(line)
+    if is_bullet_line(line):
+        append_line(output, line)
+        return
+
+    if not output or should_start_new_line(output[-1], line):
+        append_line(output, line)
+    else:
+        output[-1] = f"{output[-1]} {line}".strip()
 
 
 def split_resume_sections(text: str) -> dict[str, str]:
@@ -165,12 +181,14 @@ def extract_project_names(text: str) -> list[str]:
         if is_bullet_line(line):
             continue
         clean_line = clean_project_line(line)
+        had_pipe = "|" in clean_line
         if "|" in clean_line:
             clean_line = clean_line.split("|", 1)[0].strip()
         if not clean_line or is_non_project_line(clean_line):
             continue
-        if looks_like_project_title(clean_line):
+        if (had_pipe or len(clean_line.split()) >= 2) and looks_like_project_title(clean_line):
             projects.append(clean_line[:180])
+    projects.extend(extract_project_titles_from_text(section))
     if projects:
         return unique(projects)[:7]
     return fallback_project_names(text)[:5]
@@ -187,14 +205,15 @@ def fallback_project_names(text: str) -> list[str]:
         if not match:
             continue
         candidate = clean_project_line(match.group(1))
-        if 1 <= len(candidate.split()) <= 8 and not is_non_project_line(candidate):
+        if looks_like_project_title(candidate) and not is_non_project_line(candidate):
             projects.append(candidate[:180])
     return unique(projects)
 
 
 def build_experience_summary(text: str, skills: list[str], projects: list[str]) -> str:
     _ = text
-    skill_phrase = join_human(skills[:8]) if skills else "software engineering"
+    summary_skills = order_summary_skills(skills)[:8]
+    skill_phrase = join_human(summary_skills) if summary_skills else "software engineering"
     project_names = [project.split("–", 1)[0].split("-", 1)[0].strip() for project in projects[:5]]
     if project_names:
         project_sentence = f"Built projects including {join_human(project_names)}."
@@ -209,6 +228,27 @@ def build_experience_summary(text: str, skills: list[str], projects: list[str]) 
 
 def clean_whitespace(value: str) -> str:
     return re.sub(r"\s+", " ", value.strip())
+
+
+def split_inline_section_heading(line: str) -> list[str]:
+    clean_line = clean_whitespace(line)
+    if not clean_line:
+        return []
+
+    heading_patterns = [
+        ("WORK EXPERIENCE & PROJECTS", r"work\s+experience\s*&\s*projects"),
+        ("TECHNICAL SKILLS", r"technical\s+skills"),
+        ("CAMPUS INVOLVEMENT", r"campus\s+involvement"),
+        ("WORK EXPERIENCE", r"work\s+experience"),
+        ("EDUCATION", r"education"),
+        ("PROJECTS", r"projects"),
+        ("SKILLS", r"skills"),
+    ]
+    for heading, pattern in heading_patterns:
+        match = re.match(rf"^\s*({pattern})\s*:?\s+(.+)$", clean_line, flags=re.IGNORECASE)
+        if match:
+            return [heading, match.group(2).strip()]
+    return [line]
 
 
 def append_line(output: list[str], line: str) -> None:
@@ -261,6 +301,27 @@ def is_project_title_row(line: str) -> bool:
     return looks_like_project_title(title)
 
 
+def extract_project_titles_from_text(text: str) -> list[str]:
+    titles: list[str] = []
+    for match in re.finditer(r"\|", text):
+        title = best_project_title_before_pipe(text[: match.start()])
+        if len(title.split()) >= 2 and looks_like_project_title(title) and not is_non_project_line(title):
+            titles.append(title[:180])
+    return unique(titles)
+
+
+def best_project_title_before_pipe(value: str) -> str:
+    segment = value.rsplit("\n", 1)[-1].rsplit("|", 1)[-1]
+    words = clean_project_line(segment).split()
+    for start_index, word in enumerate(words):
+        if not word[:1].isupper():
+            continue
+        candidate = clean_project_line(" ".join(words[start_index:]))
+        if looks_like_project_title(candidate):
+            return candidate
+    return ""
+
+
 def canonical_heading(value: str) -> str:
     return re.sub(r"\s+", " ", value.strip().upper().replace(" AND ", " & "))
 
@@ -274,6 +335,10 @@ def looks_like_project_title(line: str) -> bool:
     if not stripped or stripped[0].islower():
         return False
     if stripped.lower().startswith(PROJECT_FRAGMENT_STARTS):
+        return False
+    if any(f" {fragment}" in stripped.lower() for fragment in PROJECT_FRAGMENT_STARTS):
+        return False
+    if "," in stripped:
         return False
     if len(line.split()) > 14:
         return False
@@ -297,6 +362,12 @@ def join_human(values: list[str]) -> str:
     if len(clean_values) <= 1:
         return "".join(clean_values)
     return ", ".join(clean_values[:-1]) + f", and {clean_values[-1]}"
+
+
+def order_summary_skills(skills: list[str]) -> list[str]:
+    priority = [skill for skill in SUMMARY_SKILL_PRIORITY if skill in skills]
+    remaining = [skill for skill in skills if skill not in priority]
+    return priority + remaining
 
 
 def unique(values: list[str]) -> list[str]:

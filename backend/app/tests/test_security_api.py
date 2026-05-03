@@ -500,3 +500,50 @@ def test_resume_import_section_parser_extracts_clean_projects_and_technical_skil
     assert {"React", "Next.js", "FastAPI", "PostgreSQL", "Docker"} <= set(skills)
     assert "Korean" not in skills
     assert "English" not in skills
+
+
+def test_resume_import_handles_inline_projects_heading_and_rejects_fragments() -> None:
+    from app.services.resume_import_service import (
+        build_experience_summary,
+        extract_project_names,
+        extract_skills_from_technical_skills_section,
+        normalize_resume_text,
+    )
+
+    resume_text = """
+    PROJECTS DocuParse – AI-Powered Document Understanding System | FastAPI, Next.js, PostgreSQL,
+    Docker
+    - a multi-stage processing pipeline for OCR and document parsing.
+    Smart Seat & Facility Congestion Analysis System | Next.js, FastAPI, PostgreSQL, Docker
+    - product-facing features for facility congestion analysis.
+    ApplyPilot – Rule-Based Job-Fit Evaluation Platform | Next.js, FastAPI, PostgreSQL, Docker
+    - backend persistence and job saving for analyzed applications.
+    Student Academic Management System (SAM) | Spring Boot, MySQL, React, GitHub Actions
+    - developed management workflows.
+    CNN vs. SNN Image Classification Comparison | Python, NumPy, PyTorch, Matplotlib
+    - and tested a 3-layer Spiking Neural Network.
+
+    TECHNICAL SKILLS Technical Languages: C, Java, Python, HTML, CSS, JavaScript, SQL
+    Frameworks: React, Next.js, Node.js, Express.js, Spring Boot, FastAPI, REST API
+    Databases: MySQL, PostgreSQL
+    Tools: Git, GitHub, Docker, Linux
+    """
+
+    normalized = normalize_resume_text(resume_text)
+    projects = extract_project_names(normalized)
+    skills = extract_skills_from_technical_skills_section(normalized)
+    summary = build_experience_summary(normalized, skills, projects)
+
+    assert "PROJECTS\nDocuParse" in normalized
+    assert "TECHNICAL SKILLS\nTechnical Languages" in normalized
+    assert projects == [
+        "DocuParse – AI-Powered Document Understanding System",
+        "Smart Seat & Facility Congestion Analysis System",
+        "ApplyPilot – Rule-Based Job-Fit Evaluation Platform",
+        "Student Academic Management System (SAM)",
+        "CNN vs. SNN Image Classification Comparison",
+    ]
+    assert len(projects) == 5
+    assert "Built projects including DocuParse" in summary
+    for fragment in ["and tested a 3", "a multi", "product", "backend persistence", "job saving"]:
+        assert fragment not in summary
