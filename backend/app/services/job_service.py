@@ -14,6 +14,7 @@ from app.services.profile_service import ProfileService
 
 class JobService:
     def __init__(self, db: Session) -> None:
+        self.db = db
         self.jobs = JobRepository(db)
         self.applications = ApplicationService(db)
         self.profiles = ProfileService(db)
@@ -52,6 +53,21 @@ class JobService:
     def analyze_for_user(self, *, user: User, job_id: int) -> JobAnalysis:
         job = self.get_for_user(user=user, job_id=job_id)
         return self._run_analysis(user=user, job=job)
+
+    def reanalyze_all_for_user(self, user: User) -> tuple[int, int]:
+        jobs = self.jobs.list_by_user_id(user.id)
+        reanalyzed_count = 0
+        failed_count = 0
+
+        for job in jobs:
+            try:
+                self._run_analysis(user=user, job=job)
+                reanalyzed_count += 1
+            except Exception:
+                self.db.rollback()
+                failed_count += 1
+
+        return reanalyzed_count, failed_count
 
     def get_analysis_for_user(self, *, user: User, job_id: int) -> JobAnalysis:
         self.get_for_user(user=user, job_id=job_id)

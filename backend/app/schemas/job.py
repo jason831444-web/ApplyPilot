@@ -96,3 +96,8 @@ class BulkDeleteJobsRequest(BaseModel):
 
 class BulkDeleteResponse(BaseModel):
     deleted_count: int = Field(ge=0)
+
+
+class ReanalyzeAllJobsResponse(BaseModel):
+    reanalyzed_count: int = Field(ge=0)
+    failed_count: int = Field(ge=0)

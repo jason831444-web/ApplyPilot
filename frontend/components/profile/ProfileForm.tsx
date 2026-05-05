@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, uploadResume, reanalyzeAllJobs } from "@/lib/api";
 import type { Profile, ProfileUpdate } from "@/lib/types";
-import { Button } from "@/components/ui/Button";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { ErrorState, LoadingState } from "@/components/ui/State";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -61,6 +61,10 @@ export function ProfileForm() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingResume, setIsUploadingResume] = useState(false);
+  const [isReanalyzing, setIsReanalyzing] = useState(false);
+  const [showReanalysisPrompt, setShowReanalysisPrompt] = useState(false);
+  const [reanalysisMessage, setReanalysisMessage] = useState<string | null>(null);
+  const [reanalysisError, setReanalysisError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -131,6 +135,9 @@ export function ProfileForm() {
     setIsSaving(true);
     setError(null);
     setSuccess(null);
+    setShowReanalysisPrompt(false);
+    setReanalysisMessage(null);
+    setReanalysisError(null);
 
     if (resumeText.length > 30000) {
       setError("Resume text must be 30,000 characters or fewer.");
@@ -148,28 +155,41 @@ export function ProfileForm() {
       return;
     }
 
-        try {
+    try {
       const data = await apiRequest<Profile>("/api/profile/me", {
         method: "PUT",
         token,
         body: payload,
       });
       setProfile(data);
-
-      try {
-        const result = await reanalyzeAllJobs(token);
-        setSuccess(
-          `Profile saved. Reanalyzed ${result.reanalyzed_count} jobs.${
-            result.failed_count > 0 ? ` ${result.failed_count} failed.` : ""
-          }`,
-        );
-      } catch {
-        setSuccess("Profile saved, but job analyses could not be refreshed.");
-      }
+      setSuccess("Profile saved.");
+      setShowReanalysisPrompt(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to save profile.");
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function handleReanalyzeAll() {
+    if (!token) {
+      return;
+    }
+
+    setIsReanalyzing(true);
+    setReanalysisMessage(null);
+    setReanalysisError(null);
+    try {
+      const result = await reanalyzeAllJobs(token);
+      setReanalysisMessage(
+        `Reanalyzed ${result.reanalyzed_count} jobs.${
+          result.failed_count > 0 ? ` ${result.failed_count} jobs could not be reanalyzed.` : ""
+        }`,
+      );
+    } catch (err) {
+      setReanalysisError(err instanceof Error ? err.message : "Unable to re-run analyses.");
+    } finally {
+      setIsReanalyzing(false);
     }
   }
 
@@ -185,6 +205,9 @@ export function ProfileForm() {
     setIsUploadingResume(true);
     setError(null);
     setSuccess(null);
+    setShowReanalysisPrompt(false);
+    setReanalysisMessage(null);
+    setReanalysisError(null);
     try {
       const result = await uploadResume(file, token);
       const confirmed = window.confirm(
@@ -225,6 +248,28 @@ export function ProfileForm() {
 
       {error ? <ErrorState message={error} /> : null}
       {success ? <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">{success}</p> : null}
+      {showReanalysisPrompt ? (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <p className="text-sm text-amber-900">
+              Your profile changed. Re-run analysis for all saved jobs to update scores and recommendations.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" onClick={handleReanalyzeAll} disabled={isReanalyzing} variant="secondary">
+                {isReanalyzing ? "Re-running..." : "Re-run All Analyses"}
+              </Button>
+              {reanalysisMessage ? (
+                <>
+                  <ButtonLink href="/dashboard" variant="ghost">Dashboard</ButtonLink>
+                  <ButtonLink href="/jobs" variant="ghost">Jobs</ButtonLink>
+                </>
+              ) : null}
+            </div>
+          </div>
+          {reanalysisMessage ? <p className="mt-2 text-sm text-green-700">{reanalysisMessage}</p> : null}
+          {reanalysisError ? <p className="mt-2 text-sm text-red-700">{reanalysisError}</p> : null}
+        </div>
+      ) : null}
 
       <Card>
         <CardHeader

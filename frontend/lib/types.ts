@@ -162,6 +162,11 @@ export type BulkDeleteResponse = {
   deleted_count: number;
 };
 
+export type ReanalyzeAllJobsResponse = {
+  reanalyzed_count: number;
+  failed_count: number;
+};
+
 export type ResumeTailoring = {
   tailored_summary: string;
   bullet_suggestions: string[];

@@ -1,4 +1,4 @@
-import type { BulkDeleteResponse, ResumeImportResult, ResumeTailoring } from "./types";
+import type { BulkDeleteResponse, ReanalyzeAllJobsResponse, ResumeImportResult, ResumeTailoring } from "./types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api";
 
@@ -156,12 +156,9 @@ export async function uploadResume(file: File, token: string): Promise<ResumeImp
   return response.json() as Promise<ResumeImportResult>;
 }
 
-export async function reanalyzeAllJobs(token: string) {
-  return apiRequest<{ reanalyzed_count: number; failed_count: number }>(
-    "/api/jobs/reanalyze-all",
-    {
-      method: "POST",
-      token,
-    },
-  );
+export function reanalyzeAllJobs(token: string): Promise<ReanalyzeAllJobsResponse> {
+  return apiRequest<ReanalyzeAllJobsResponse>("/api/jobs/reanalyze-all", {
+    method: "POST",
+    token,
+  });
 }

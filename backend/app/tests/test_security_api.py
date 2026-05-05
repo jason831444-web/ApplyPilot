@@ -225,6 +225,70 @@ def test_user_cannot_bulk_delete_another_users_jobs() -> None:
     assert client.get(f"/api/jobs/{job_id}", headers=auth_headers(owner_token)).status_code == 200
 
 
+def test_reanalyze_all_requires_auth() -> None:
+    response = client.post("/api/jobs/reanalyze-all")
+
+    assert response.status_code == 401
+
+
+def test_reanalyze_all_only_processes_current_users_jobs() -> None:
+    owner_token = register_and_login("reanalyze-owner")
+    other_token = register_and_login("reanalyze-other")
+    owner_job_id = create_job(owner_token)
+    other_job_id = create_job(other_token)
+
+    response = client.post("/api/jobs/reanalyze-all", headers=auth_headers(owner_token))
+
+    assert response.status_code == 200
+    assert response.json() == {"reanalyzed_count": 1, "failed_count": 0}
+    assert client.get(f"/api/jobs/{owner_job_id}/analysis", headers=auth_headers(owner_token)).status_code == 200
+    assert client.get(f"/api/jobs/{other_job_id}/analysis", headers=auth_headers(other_token)).status_code == 404
+
+
+def test_reanalyze_all_updates_existing_analyses() -> None:
+    token = register_and_login("reanalyze-update")
+    job_id, _application_id = create_analyzed_job(token)
+    initial_response = client.get(f"/api/jobs/{job_id}/analysis", headers=auth_headers(token))
+    assert initial_response.status_code == 200
+    initial_analysis = initial_response.json()
+    assert "Docker" in initial_analysis["missing_preferred_skills"]
+
+    update_profile_for_tailoring(token)
+    response = client.post("/api/jobs/reanalyze-all", headers=auth_headers(token))
+    updated_response = client.get(f"/api/jobs/{job_id}/analysis", headers=auth_headers(token))
+
+    assert response.status_code == 200
+    assert response.json() == {"reanalyzed_count": 1, "failed_count": 0}
+    assert updated_response.status_code == 200
+    updated_analysis = updated_response.json()
+    assert updated_analysis["id"] == initial_analysis["id"]
+    assert updated_analysis["resume_match_score"] > initial_analysis["resume_match_score"]
+    assert "Docker" not in updated_analysis["missing_preferred_skills"]
+
+
+def test_reanalyze_all_creates_missing_analyses() -> None:
+    token = register_and_login("reanalyze-create")
+    job_id = create_job(token)
+    assert client.get(f"/api/jobs/{job_id}/analysis", headers=auth_headers(token)).status_code == 404
+
+    response = client.post("/api/jobs/reanalyze-all", headers=auth_headers(token))
+    analysis_response = client.get(f"/api/jobs/{job_id}/analysis", headers=auth_headers(token))
+
+    assert response.status_code == 200
+    assert response.json() == {"reanalyzed_count": 1, "failed_count": 0}
+    assert analysis_response.status_code == 200
+    assert analysis_response.json()["job_id"] == job_id
+
+
+def test_reanalyze_all_returns_zero_when_user_has_no_jobs() -> None:
+    token = register_and_login("reanalyze-empty")
+
+    response = client.post("/api/jobs/reanalyze-all", headers=auth_headers(token))
+
+    assert response.status_code == 200
+    assert response.json() == {"reanalyzed_count": 0, "failed_count": 0}
+
+
 def test_user_can_bulk_delete_own_applications_without_deleting_jobs() -> None:
     token = register_and_login("bulk-application-owner")
     job_id = create_job(token)
