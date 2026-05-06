@@ -497,6 +497,90 @@ def test_analyze_new_preserves_required_and_preferred_missing_skill_split() -> N
     assert {"AWS", "Azure"} <= set(analysis["keywords_to_consider"])
 
 
+def test_analyze_new_lmi_uppercase_standalone_preferred_heading_preserves_skill_split() -> None:
+    token = register_and_login("analysis-lmi-heading")
+    profile_response = client.put(
+        "/api/profile/me",
+        headers=auth_headers(token),
+        json={
+            "resume_text": "Python SQL Git Docker PostgreSQL MySQL Pandas NumPy",
+            "skills": ["Python", "SQL", "Git", "Docker", "PostgreSQL", "MySQL", "Pandas", "NumPy"],
+            "projects": [],
+            "experience_summary": "",
+            "target_roles": [],
+            "target_locations": [],
+            "graduation_date": None,
+            "work_authorization_notes": "",
+        },
+    )
+    assert profile_response.status_code == 200
+
+    analyze_response = client.post(
+        "/api/jobs/analyze-new",
+        headers=auth_headers(token),
+        json={
+            "company_name": "LMI Example",
+            "job_title": "Health Python Programmer - Junior",
+            "location": "Remote",
+            "job_description": (
+                "MINIMUM QUALIFICATIONS\n\n"
+                "Bachelor's degree in Computer Science, Software Engineering, or a related field.\n"
+                "2+ years of professional Python programming experience.\n"
+                "Proficiency with Python, including experience with libraries such as PySpark, Pandas, NumPy, Polars, or similar frameworks.\n"
+                "Basic understanding of database management and querying using SQL and/or NoSQL databases like Snowflake, PostgreSQL, MySQL, or MongoDB.\n"
+                "Familiarity with version control tools like Git for collaborative development workflows.\n"
+                "Experience using Agile methodologies (SAFe, Scrum), JIRA and other tools to plan Sprints and track the status of changes and testing.\n"
+                "Experience writing and executing unit and integration tests to ensure code quality.\n\n"
+                "PREFERRED QUALIFICATIONS\n\n"
+                "Experience in federal consulting.\n"
+                "Demonstrated experience with healthcare data projects (e.g. claims processing or payment systems) or financial/banking systems.\n"
+                "Awareness of healthcare domain challenges, such as compliance with HIPAA.\n"
+                "Knowledge of containerization tools (e.g., Docker) and cloud environments (AWS, Azure, or other providers).\n\n"
+                "Target Salary Range: $70,000 - $104,000"
+            ),
+            "source_url": None,
+            "source_type": "manual",
+        },
+    )
+
+    assert analyze_response.status_code == 201
+    analysis = analyze_response.json()["analysis"]
+    assert {
+        "Python",
+        "SQL",
+        "Snowflake",
+        "PostgreSQL",
+        "MySQL",
+        "NoSQL",
+        "MongoDB",
+        "Git",
+        "Agile",
+        "Scrum",
+        "JIRA",
+        "Unit Testing",
+        "Integration Testing",
+    } <= set(analysis["required_skills"])
+    assert {"Docker", "AWS", "Azure", "HIPAA"} <= set(analysis["preferred_skills"])
+    assert {
+        "Snowflake",
+        "NoSQL",
+        "MongoDB",
+        "Agile",
+        "Scrum",
+        "JIRA",
+        "Unit Testing",
+        "Integration Testing",
+    } <= set(analysis["missing_required_skills"])
+    assert "AWS" not in analysis["required_skills"]
+    assert "Azure" not in analysis["required_skills"]
+    assert "AWS" not in analysis["missing_required_skills"]
+    assert "Azure" not in analysis["missing_required_skills"]
+    assert "AWS" not in analysis["missing_technical_skills"]
+    assert "Azure" not in analysis["missing_technical_skills"]
+    assert {"AWS", "Azure"} <= set(analysis["missing_preferred_technical_skills"])
+    assert {"AWS", "Azure"} <= set(analysis["keywords_to_consider"])
+
+
 def test_application_csv_export_requires_auth() -> None:
     response = client.get("/api/applications/export.csv")
 

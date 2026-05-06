@@ -27,25 +27,66 @@ def unique_preserve(values: list[str]) -> list[str]:
     return result
 
 
+SECTION_HEADING_TERMS = [
+    "about",
+    "about the role",
+    "basic qualifications",
+    "benefits",
+    "bonus",
+    "bonus points",
+    "compensation",
+    "disclaimer",
+    "eeo",
+    "equal opportunity",
+    "hiring process",
+    "interview process",
+    "legal",
+    "minimum qualifications",
+    "nice to have",
+    "our stack",
+    "preferred",
+    "preferred qualifications",
+    "recruiting process",
+    "required",
+    "required qualifications",
+    "requirements",
+    "responsibilities",
+    "target salary range",
+    "tech stack",
+    "tools for the job",
+    "what we offer",
+    "what you need",
+    "what you'll do",
+    "what you will do",
+]
+
+SECTION_HEADING_ALTERNATION = "|".join(re.escape(term) for term in sorted(SECTION_HEADING_TERMS, key=len, reverse=True))
+SECTION_HEADING_PATTERN = re.compile(
+    rf"(?im)(?:^[ \t]*(?P<line_heading>{SECTION_HEADING_ALTERNATION})[ \t]*:?[ \t]*(?:\r?\n|$))"
+    rf"|(?:\b(?P<inline_heading>{SECTION_HEADING_ALTERNATION})[ \t]*:)"
+)
+
+
 def split_sections(text: str) -> list[tuple[str, str]]:
-    inline_sections = split_inline_sections(text)
-    if inline_sections:
-        return inline_sections
+    matches = list(SECTION_HEADING_PATTERN.finditer(text))
+    if not matches:
+        stripped = text.strip()
+        return [("general", stripped)] if stripped else []
 
-    lines = [line.strip() for line in text.splitlines()]
-    sections: list[tuple[str, list[str]]] = [("general", [])]
-    heading_pattern = re.compile(r"^[A-Za-z /&+-]{3,70}:?$")
+    sections: list[tuple[str, str]] = []
+    prefix = text[: matches[0].start()].strip()
+    if prefix:
+        sections.append(("general", prefix))
 
-    for line in lines:
-        if not line:
-            continue
-        clean = line.rstrip(":").strip()
-        if heading_pattern.match(line) and len(line.split()) <= 6:
-            sections.append((clean.lower(), []))
-        else:
-            sections[-1][1].append(line)
+    for index, match in enumerate(matches):
+        heading = (match.group("line_heading") or match.group("inline_heading") or "").strip().lower()
+        body_start = match.end()
+        body_end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        body = text[body_start:body_end].strip()
+        if body:
+            sections.append((heading, body))
 
-    return [(heading, "\n".join(body)) for heading, body in sections if body]
+    return sections
 
 
 def split_inline_sections(text: str) -> list[tuple[str, str]]:

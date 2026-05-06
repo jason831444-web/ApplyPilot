@@ -269,6 +269,72 @@ def test_exact_lmi_senior_collaboration_and_preferred_cloud_regression() -> None
     assert "Azure" in result.missing_preferred_skills
 
 
+def test_lmi_uppercase_standalone_preferred_heading_preserves_skill_split() -> None:
+    profile = SimpleNamespace(
+        resume_text="Python SQL Git Docker PostgreSQL MySQL Pandas NumPy",
+        skills=["Python", "SQL", "Git", "Docker", "PostgreSQL", "MySQL", "Pandas", "NumPy"],
+        projects=[],
+        experience_summary="",
+        target_roles=[],
+        target_locations=[],
+        work_authorization_notes="",
+    )
+    description = """
+MINIMUM QUALIFICATIONS
+
+Bachelor's degree in Computer Science, Software Engineering, or a related field.
+2+ years of professional Python programming experience.
+Proficiency with Python, including experience with libraries such as PySpark, Pandas, NumPy, Polars, or similar frameworks.
+Basic understanding of database management and querying using SQL and/or NoSQL databases like Snowflake, PostgreSQL, MySQL, or MongoDB.
+Familiarity with version control tools like Git for collaborative development workflows.
+Experience using Agile methodologies (SAFe, Scrum), JIRA and other tools to plan Sprints and track the status of changes and testing.
+Experience writing and executing unit and integration tests to ensure code quality.
+
+PREFERRED QUALIFICATIONS
+
+Experience in federal consulting.
+Demonstrated experience with healthcare data projects (e.g. claims processing or payment systems) or financial/banking systems.
+Awareness of healthcare domain challenges, such as compliance with HIPAA.
+Knowledge of containerization tools (e.g., Docker) and cloud environments (AWS, Azure, or other providers).
+
+Target Salary Range: $70,000 - $104,000
+"""
+
+    result = DeterministicRuleBasedProvider().analyze(profile=profile, job=make_job(description))
+
+    assert {
+        "Python",
+        "SQL",
+        "Snowflake",
+        "PostgreSQL",
+        "MySQL",
+        "NoSQL",
+        "MongoDB",
+        "Git",
+        "Agile",
+        "Scrum",
+        "JIRA",
+        "Unit Testing",
+        "Integration Testing",
+    } <= set(result.required_skills)
+    assert {"Docker", "AWS", "Azure", "HIPAA"} <= set(result.preferred_skills)
+    assert {
+        "Snowflake",
+        "NoSQL",
+        "MongoDB",
+        "Agile",
+        "Scrum",
+        "JIRA",
+        "Unit Testing",
+        "Integration Testing",
+    } <= set(result.missing_required_skills)
+    assert "AWS" not in result.required_skills
+    assert "Azure" not in result.required_skills
+    assert "AWS" not in result.missing_required_skills
+    assert "Azure" not in result.missing_required_skills
+    assert {"AWS", "Azure"} <= set(result.missing_preferred_skills)
+
+
 def test_senior_collaboration_context_is_not_negative_or_ownership_concern() -> None:
     description = "Collaborate with senior developers and other team members. Requirements: Python."
 
