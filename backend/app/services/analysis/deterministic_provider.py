@@ -1,8 +1,11 @@
+import re
+
 from app.models.job import Job
 from app.models.profile import Profile
 from app.services.analysis.evidence import dedupe_evidence
 from app.services.analysis.extraction import (
     detect_employment_type,
+    extract_alternative_skill_groups,
     extract_authorization,
     extract_experience_signals,
     extract_skills_by_requirement,
@@ -20,6 +23,7 @@ from app.services.analysis.scoring import (
     score_new_grad_fit,
     score_resume_match,
     score_skill_match,
+    skill_match_patterns,
     user_likely_needs_sponsorship,
 )
 
@@ -30,9 +34,12 @@ class DeterministicRuleBasedProvider:
     def analyze(self, profile: Profile, job: Job) -> JobAnalysisResult:
         description = job.job_description or ""
         required_skills, preferred_skills, skill_evidence = extract_skills_by_requirement(description)
+        alternative_skill_groups = extract_alternative_skill_groups(description)
         has_clean_skill_sections = self._has_clean_skill_sections(description)
-        seniority_signals, positive_signals, negative_signals = extract_experience_signals(description)
+        analysis_text = f"{job.job_title or ''}\n{description}"
+        seniority_signals, positive_signals, negative_signals = extract_experience_signals(analysis_text)
         authorization_risk, authorization_evidence = extract_authorization(description)
+        context_labels = {item["label"] for item in skill_evidence if item.get("type") == "domain"}
         new_grad_fit_label, new_grad_fit_score = score_new_grad_fit(
             positive_signals=positive_signals,
             negative_signals=negative_signals,
@@ -42,8 +49,20 @@ class DeterministicRuleBasedProvider:
         profile_text = self._profile_text(profile)
         required_skill_score, missing_required_skills = score_skill_match(required_skills, profile_text)
         preferred_skill_score, missing_preferred_skills = score_skill_match(preferred_skills, profile_text)
+        missing_required_skills = self._remove_satisfied_alternative_gaps(
+            missing_skills=missing_required_skills,
+            alternative_skill_groups=alternative_skill_groups,
+            profile_text=profile_text,
+        )
+        if len(missing_required_skills) != len(required_skills):
+            required_skill_score = self._rescore(required_skills, missing_required_skills)
         all_job_skills = unique_preserve(required_skills + preferred_skills)
-        resume_match_score = score_resume_match(all_job_skills, profile_text)
+        scored_job_skills = self._collapse_satisfied_alternatives(
+            skills=all_job_skills,
+            alternative_skill_groups=alternative_skill_groups,
+            profile_text=profile_text,
+        )
+        resume_match_score = score_resume_match(scored_job_skills, profile_text)
         technical_skill_count = len(all_job_skills)
         required_skill_score, preferred_skill_score, resume_match_score = apply_sparse_skill_caps(
             required_skill_score=required_skill_score,
@@ -70,6 +89,7 @@ class DeterministicRuleBasedProvider:
             new_grad_fit_score=new_grad_fit_score,
             authorization_risk=authorization_risk,
             negative_signals=negative_signals,
+            context_labels=context_labels,
         )
         recommendation, recommendation_reason = recommend(
             overall=total_score,
@@ -101,6 +121,7 @@ class DeterministicRuleBasedProvider:
             technical_skill_count=technical_skill_count,
             location_fit_score=location_fit_score,
             negative_signals=negative_signals,
+            context_labels=context_labels,
         )
         next_actions = self._next_actions(
             recommendation=recommendation,
@@ -151,6 +172,7 @@ class DeterministicRuleBasedProvider:
                 seniority_signals,
                 authorization_evidence,
                 has_clean_skill_sections=has_clean_skill_sections,
+                context_labels=context_labels,
             ),
         )
 
@@ -211,6 +233,7 @@ class DeterministicRuleBasedProvider:
         technical_skill_count: int,
         location_fit_score: int,
         negative_signals: list[dict],
+        context_labels: set[str],
     ) -> list[str]:
         concerns: list[str] = []
         if not has_required_skills:
@@ -223,10 +246,6 @@ class DeterministicRuleBasedProvider:
             concerns.append("Skill matching confidence is limited due to sparse or unstructured technical requirements.")
         if not has_clean_skill_sections and technical_skill_count <= 2:
             concerns.append("This posting is unstructured, so the score should be interpreted cautiously.")
-        if missing_required_skills:
-            concerns.append(f"Missing required skills: {', '.join(missing_required_skills[:8])}.")
-        if missing_preferred_skills:
-            concerns.append(f"Missing preferred skills: {', '.join(missing_preferred_skills[:8])}.")
         missing_technical_skills = self._dedupe_text(missing_required_skills + missing_preferred_skills)
         if missing_technical_skills:
             concerns.append(f"Missing technical skills detected: {', '.join(missing_technical_skills[:8])}.")
@@ -240,17 +259,19 @@ class DeterministicRuleBasedProvider:
             labels = [str(signal.get("label", "")).replace("_", " ") for signal in negative_signals[:4]]
             if self._has_seniority_or_ownership_signal(negative_signals):
                 concerns.append("The posting emphasizes seniority, ownership, or high-agency expectations.")
-            concerns.append(f"Startup intensity or ownership signals may raise the bar for a new grad: {', '.join(labels)}.")
-            concerns.append("Startup intensity and ownership expectations may raise the bar for this role.")
+            concerns.append(f"Startup intensity and ownership expectations may raise the bar for this role: {', '.join(labels)}.")
         if authorization_risk == "high":
             concerns.append("Work authorization language appears high risk.")
             concerns.append("This role may require work authorization or sponsorship that is not currently met.")
         elif authorization_risk == "unknown":
-            concerns.append("No clear sponsorship or work authorization evidence was found.")
             concerns.append("Work authorization requirements are unclear from the job posting.")
+        if "Nontraditional Work" in context_labels:
+            concerns.append("This appears to be a flexible platform-based or gig-like role rather than a standard full-time SWE position.")
+        if "Staffing/Training Placement" in context_labels:
+            concerns.append("This posting appears to have staffing, training, or client-placement signals; verify employment terms carefully.")
         if location_fit_score < 50:
             concerns.append("Location does not appear to match the profile targets.")
-        return self._dedupe_text(concerns)
+        return self._dedupe_concerns(concerns)
 
     def _has_seniority_or_ownership_signal(self, signals: list[dict]) -> bool:
         keywords = {"senior", "staff", "principal", "lead", "architect", "ownership", "cto", "all rounder"}
@@ -266,6 +287,68 @@ class DeterministicRuleBasedProvider:
                 seen.add(key)
                 result.append(value)
         return result
+
+    def _dedupe_concerns(self, values: list[str]) -> list[str]:
+        normalized_groups = [
+            ("missing technical skills", "missing technical skills detected"),
+            ("authorization unclear", "work authorization requirements are unclear"),
+            ("ownership intensity", "ownership expectations may raise the bar"),
+            ("staffing placement", "staffing, training, or client-placement"),
+            ("gig platform", "platform-based or gig-like"),
+        ]
+        seen: set[str] = set()
+        result: list[str] = []
+        for value in values:
+            lowered = value.lower().strip().rstrip(".")
+            if lowered.startswith(("missing required skills:", "missing preferred skills:")):
+                continue
+            if lowered.startswith("no clear sponsorship or work authorization evidence"):
+                continue
+            key = lowered
+            for group_key, marker in normalized_groups:
+                if marker in lowered:
+                    key = group_key
+                    break
+            if key and key not in seen:
+                seen.add(key)
+                result.append(value)
+        return result
+
+    def _remove_satisfied_alternative_gaps(
+        self,
+        *,
+        missing_skills: list[str],
+        alternative_skill_groups: list[list[str]],
+        profile_text: str,
+    ) -> list[str]:
+        filtered = list(missing_skills)
+        for group in alternative_skill_groups:
+            if any(self._profile_matches_skill(skill, profile_text) for skill in group):
+                filtered = [skill for skill in filtered if skill not in group]
+        return filtered
+
+    def _collapse_satisfied_alternatives(
+        self,
+        *,
+        skills: list[str],
+        alternative_skill_groups: list[list[str]],
+        profile_text: str,
+    ) -> list[str]:
+        collapsed = list(skills)
+        for group in alternative_skill_groups:
+            matched = [skill for skill in group if self._profile_matches_skill(skill, profile_text)]
+            if matched:
+                collapsed = [skill for skill in collapsed if skill not in group or skill in matched]
+        return collapsed
+
+    def _profile_matches_skill(self, skill: str, profile_text: str) -> bool:
+        return any(re.search(pattern, profile_text, re.IGNORECASE) for pattern in skill_match_patterns(skill))
+
+    def _rescore(self, skills: list[str], missing_skills: list[str]) -> int:
+        if not skills:
+            return 50
+        matched_count = max(0, len(skills) - len(missing_skills))
+        return round((matched_count / len(skills)) * 100)
 
     def _has_clean_skill_sections(self, description: str) -> bool:
         return any(section_kind(heading) in {"required", "preferred"} for heading, _body in split_sections(description))
@@ -299,8 +382,11 @@ class DeterministicRuleBasedProvider:
         authorization_evidence: list[dict],
         *,
         has_clean_skill_sections: bool,
+        context_labels: set[str],
     ) -> float:
         evidence_count = len(required_skills) + len(preferred_skills) + len(seniority_signals) + len(authorization_evidence)
+        if "Staffing/Training Placement" in context_labels and len(required_skills) + len(preferred_skills) <= 3:
+            return 0.48
         if not has_clean_skill_sections and len(required_skills) + len(preferred_skills) <= 2:
             return 0.52
         if evidence_count >= 8:

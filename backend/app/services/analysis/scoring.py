@@ -118,9 +118,13 @@ def cap_overall_score(
     new_grad_fit_score: int,
     authorization_risk: str,
     negative_signals: list[dict],
+    context_labels: set[str] | None = None,
 ) -> int:
     capped_score = score
+    context_labels = context_labels or set()
     has_startup_intensity = any(int(signal.get("severity", 1)) >= 2 for signal in negative_signals)
+    if "Staffing/Training Placement" in context_labels:
+        capped_score = min(capped_score, 58)
     if new_grad_fit_score < 45 and authorization_risk in {"unknown", "high"} and has_startup_intensity:
         capped_score = min(capped_score, 55)
     if new_grad_fit_label in {"weak_fit", "not_new_grad_friendly"}:
@@ -140,13 +144,13 @@ def score_new_grad_fit(
     labels = {str(signal.get("label", "")).lower() for signal in seniority_signals}
     has_strong_positive = bool(labels & {"new grad", "entry-level", "university graduate", "0-1 years", "0-2 years"})
     has_good_positive = bool(labels & {"junior", "1+ years"})
-    has_mixed_requirement = bool(labels & {"2+ years"})
-    has_senior_title = bool(labels & {"senior", "staff", "principal", "lead", "architect"})
+    has_mixed_requirement = bool(labels & {"1-4 years", "2+ years"})
+    has_senior_title = bool(labels & {"senior", "staff", "principal", "architect"})
     has_very_high_experience = "5+ years" in labels
     has_high_experience = "3+ years" in labels
     negative_severity = sum(int(signal.get("severity", 1)) for signal in negative_signals)
 
-    if has_senior_title or has_very_high_experience:
+    if (has_senior_title or has_very_high_experience) and not has_strong_positive and not has_good_positive:
         return "not_new_grad_friendly", 15
     if negative_severity >= 6:
         return "weak_fit", 38

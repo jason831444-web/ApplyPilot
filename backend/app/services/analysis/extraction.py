@@ -159,6 +159,40 @@ def extract_skills_by_requirement(text: str) -> tuple[list[str], list[str], list
     return required, preferred, dedupe_evidence(evidence)
 
 
+def extract_alternative_skill_groups(text: str) -> list[list[str]]:
+    groups: list[list[str]] = []
+    sentences = re.split(r"(?<=[.!?])\s+|\n+", text)
+    choice_pattern = re.compile(
+        r"\b(?:at least one of|one of the following|one of|proficiency in at least one of|"
+        r"experience with|experience in)\b",
+        re.IGNORECASE,
+    )
+
+    for sentence in sentences:
+        if not sentence.strip():
+            continue
+        has_choice_language = bool(choice_pattern.search(sentence)) and re.search(r"\bor\b|,", sentence, re.IGNORECASE)
+        has_inline_or = bool(re.search(r"\b[A-Za-z+#.]+\s+or\s+[A-Za-z+#.]+\b", sentence))
+        if not has_choice_language and not has_inline_or:
+            continue
+        skills = [skill for skill in find_skills(sentence, include_domain_signals=False) if skill not in DOMAIN_SIGNAL_LABELS]
+        if len(skills) >= 2:
+            groups.append(unique_preserve(skills))
+
+    return unique_skill_groups(groups)
+
+
+def unique_skill_groups(groups: list[list[str]]) -> list[list[str]]:
+    seen: set[tuple[str, ...]] = set()
+    result: list[list[str]] = []
+    for group in groups:
+        key = tuple(sorted(skill.lower() for skill in group))
+        if key not in seen:
+            seen.add(key)
+            result.append(group)
+    return result
+
+
 def evidence_type_for_skill(skill: str) -> str:
     return "domain" if skill in DOMAIN_SIGNAL_LABELS else "skill"
 
@@ -178,6 +212,8 @@ def extract_experience_signals(text: str) -> tuple[list[dict], list[dict], list[
 
     for rule in EXPERIENCE_RULES:
         for match in re.finditer(rule.pattern, text, re.IGNORECASE):
+            if should_skip_experience_signal(rule.label, text, match):
+                continue
             item = make_evidence("seniority", rule.label, phrase_window(text, match.start(), match.end()))
             item["polarity"] = rule.polarity
             item["severity"] = rule.severity
@@ -191,6 +227,29 @@ def extract_experience_signals(text: str) -> tuple[list[dict], list[dict], list[
     positive = [signal for signal in all_signals if signal.get("polarity") == "positive"]
     negative = [signal for signal in all_signals if signal.get("polarity") == "negative"]
     return all_signals, positive, negative
+
+
+def should_skip_experience_signal(label: str, text: str, match: re.Match[str]) -> bool:
+    window_start = max(0, match.start() - 80)
+    window_end = min(len(text), match.end() + 80)
+    context = text[window_start:window_end].lower()
+
+    if label in {"senior", "senior team"}:
+        collaboration_patterns = [
+            r"collaborat(?:e|ing)\s+with\s+senior\s+(?:developers|engineers|team members)",
+            r"work(?:ing)?\s+with\s+senior\s+(?:developers|engineers|team members)",
+            r"learn\s+from\s+senior\s+(?:developers|engineers)",
+            r"senior\s+team members",
+        ]
+        return any(re.search(pattern, context) for pattern in collaboration_patterns)
+
+    if label == "junior":
+        return bool(re.search(r"\bmentor\s+junior\s+(?:teammates|developers|engineers)\b", context))
+
+    if label == "lead":
+        return match.group(0).lower().startswith("leading ")
+
+    return False
 
 
 def extract_authorization(text: str) -> tuple[str, list[dict]]:

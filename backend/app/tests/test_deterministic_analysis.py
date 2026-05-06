@@ -142,6 +142,143 @@ def test_job_analysis_read_exposes_concerns() -> None:
     assert result.concerns == analysis.concerns
 
 
+def test_data_annotation_style_alternative_language_list_and_platform_signals() -> None:
+    description = (
+        "Remote coding tasks for AI models with a flexible schedule. Choose projects and receive hourly pay "
+        "through PayPal after assessment-based onboarding. Paid work becomes available through the platform, "
+        "availability may be limited by country, and some people fit this work alongside a full-time role. "
+        "Requirements: proficiency in at least one of JavaScript, TypeScript, Python, C++, React, Go, Java. "
+        "Preferred qualifications: Kotlin and Android development."
+    )
+
+    result = DeterministicRuleBasedProvider().analyze(profile=make_profile(), job=make_job(description))
+    extracted = set(result.required_skills + result.preferred_skills)
+    domain_signals = {item["label"] for item in result.evidence if item["type"] == "domain"}
+
+    assert {"Kotlin", "Android Development"} <= extracted
+    assert "Python" in result.required_skills
+    assert "React" in result.required_skills
+    assert "C++" not in result.missing_required_skills
+    assert "Go" not in result.missing_required_skills
+    assert "Java" not in result.missing_required_skills
+    assert "Nontraditional Work" in domain_signals
+    assert any("platform-based or gig-like" in concern for concern in result.concerns)
+
+
+def test_junior_python_role_ignores_senior_collaboration_context_and_extracts_data_skills() -> None:
+    job = SimpleNamespace(
+        company_name="Example Health",
+        job_title="Python Programmer - Junior",
+        location="Remote",
+        job_description=(
+            "We seek a motivated Junior Python Programmer eager to learn in a mentorship environment. "
+            "You will collaborate with senior developers and assist in designing data tools. "
+            "Requirements: 2+ years professional Python experience, PySpark, Pandas, NumPy, Polars, "
+            "Snowflake, NoSQL, Agile, Scrum, JIRA, unit testing, integration testing, test automation, "
+            "HIPAA, and healthcare compliance. Bachelor's degree completed or in progress. "
+            "Preferred qualifications: AWS, Azure."
+        ),
+    )
+
+    result = DeterministicRuleBasedProvider().analyze(profile=make_profile(), job=job)
+    extracted = set(result.required_skills + result.preferred_skills)
+    negative_labels = {str(signal.get("label", "")) for signal in result.new_grad_negative_signals}
+    positive_labels = {str(signal.get("label", "")) for signal in result.new_grad_positive_signals}
+
+    assert "senior" not in negative_labels
+    assert {"junior", "eager to learn", "mentorship"} <= positive_labels
+    assert result.new_grad_fit_label != "not_new_grad_friendly"
+    assert result.recommendation != "skip"
+    assert {
+        "PySpark",
+        "Pandas",
+        "NumPy",
+        "Polars",
+        "Snowflake",
+        "NoSQL",
+        "Agile",
+        "JIRA",
+        "Unit Testing",
+        "Integration Testing",
+        "HIPAA",
+        "Healthcare Compliance",
+    } <= extracted
+    assert "AWS" in result.preferred_skills
+    assert "Azure" in result.preferred_skills
+
+
+def test_forward_deployed_role_avoids_leading_venture_false_positive_and_extracts_context() -> None:
+    description = (
+        "Forward Deployed Engineering role backed by leading venture capital firms. "
+        "You will mentor junior teammates, lead scoped engagements, independently own customer-facing engineering work, "
+        "and build quantitative modeling, forecasting, optimization, LLM workflows, and data pipelines. "
+        "Requirements: 1-4 years of experience."
+    )
+
+    result = DeterministicRuleBasedProvider().analyze(profile=make_profile(), job=make_job(description))
+    extracted = set(result.required_skills + result.preferred_skills)
+    negative_labels = {str(signal.get("label", "")) for signal in result.new_grad_negative_signals}
+    positive_labels = {str(signal.get("label", "")) for signal in result.new_grad_positive_signals}
+
+    assert "lead" in negative_labels
+    assert not any("leading venture capital firms" in str(signal.get("text", "")).lower() for signal in result.new_grad_negative_signals)
+    assert "junior" not in positive_labels
+    assert "mentor junior teammates" in negative_labels
+    assert {
+        "Forward Deployed Engineering",
+        "Customer-Facing Engineering",
+        "Quantitative Modeling",
+        "Forecasting",
+        "Optimization",
+        "LLM Workflows",
+        "Data Pipelines",
+    } <= extracted
+    assert result.new_grad_fit_label in {"mixed_fit", "weak_fit"}
+
+
+def test_staffing_training_role_caps_sparse_generic_score_and_ignores_generic_performance() -> None:
+    profile = make_profile()
+    profile.skills = [*profile.skills, "Java"]
+    profile.resume_text = f"{profile.resume_text} Java applications."
+    description = (
+        "Java Developer role for OPT/CPT candidates. We provide pre-job training with assignments and case studies "
+        "during training, mock sessions before interviews, and multiple interview rounds with different clients. "
+        "After joining a client project, visa sponsorship may be discussed. Build generic applications with good "
+        "performance and support client project delivery."
+    )
+
+    result = DeterministicRuleBasedProvider().analyze(profile=profile, job=make_job(description))
+    extracted = set(result.required_skills + result.preferred_skills)
+    domain_signals = {item["label"] for item in result.evidence if item["type"] == "domain"}
+
+    assert "Staffing/Training Placement" in domain_signals
+    assert "Performance" not in extracted
+    assert result.overall_score <= 58
+    assert result.analysis_confidence <= 0.52
+    assert any("staffing, training, or client-placement" in concern for concern in result.concerns)
+
+
+def test_concern_deduplication_prefers_concise_unique_messages() -> None:
+    provider = DeterministicRuleBasedProvider()
+
+    concerns = provider._dedupe_concerns(
+        [
+            "Missing required skills: Python.",
+            "Missing technical skills detected: Python.",
+            "No clear sponsorship or work authorization evidence was found.",
+            "Work authorization requirements are unclear from the job posting.",
+            "Startup intensity and ownership expectations may raise the bar for this role: high ownership.",
+            "Startup intensity and ownership expectations may raise the bar for this role: high ownership.",
+        ]
+    )
+
+    assert "Missing technical skills detected: Python." in concerns
+    assert "Work authorization requirements are unclear from the job posting." in concerns
+    assert len([concern for concern in concerns if "ownership expectations" in concern]) == 1
+    assert not any(concern.startswith("Missing required skills") for concern in concerns)
+    assert not any(concern.startswith("No clear sponsorship") for concern in concerns)
+
+
 def test_range_experience_does_not_trigger_plus_year_signal() -> None:
     seniority_signals, _positive, _negative = extract_experience_signals(SAMPLE_DESCRIPTION)
     labels = [signal["label"] for signal in seniority_signals]
