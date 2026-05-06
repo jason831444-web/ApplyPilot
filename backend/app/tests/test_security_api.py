@@ -448,6 +448,55 @@ def test_analysis_concerns_survive_persist_and_readback() -> None:
     assert any("Work authorization requirements are unclear" in concern for concern in read_concerns)
 
 
+def test_analyze_new_preserves_required_and_preferred_missing_skill_split() -> None:
+    token = register_and_login("analysis-skill-split")
+    response = client.put(
+        "/api/profile/me",
+        headers=auth_headers(token),
+        json={
+            "resume_text": "Python SQL Git Docker",
+            "skills": ["Python", "SQL", "Git", "Docker"],
+            "projects": [],
+            "experience_summary": "",
+            "target_roles": [],
+            "target_locations": [],
+            "graduation_date": None,
+            "work_authorization_notes": "",
+        },
+    )
+    assert response.status_code == 200
+
+    analyze_response = client.post(
+        "/api/jobs/analyze-new",
+        headers=auth_headers(token),
+        json={
+            "company_name": "Split Corp",
+            "job_title": "Junior Data Programmer",
+            "location": "Remote",
+            "job_description": (
+                "MINIMUM QUALIFICATIONS:\n"
+                "Python, SQL, Git.\n\n"
+                "PREFERRED QUALIFICATIONS:\n"
+                "Knowledge of containerization tools (e.g., Docker) and cloud environments "
+                "(AWS, Azure, or other providers)."
+            ),
+            "source_url": None,
+            "source_type": "manual",
+        },
+    )
+
+    assert analyze_response.status_code == 201
+    analysis = analyze_response.json()["analysis"]
+    assert {"Python", "SQL", "Git"} <= set(analysis["required_skills"])
+    assert {"Docker", "AWS", "Azure"} <= set(analysis["preferred_skills"])
+    assert "AWS" not in analysis["missing_required_skills"]
+    assert "Azure" not in analysis["missing_required_skills"]
+    assert "AWS" not in analysis["missing_technical_skills"]
+    assert "Azure" not in analysis["missing_technical_skills"]
+    assert {"AWS", "Azure"} <= set(analysis["missing_preferred_technical_skills"])
+    assert {"AWS", "Azure"} <= set(analysis["keywords_to_consider"])
+
+
 def test_application_csv_export_requires_auth() -> None:
     response = client.get("/api/applications/export.csv")
 
