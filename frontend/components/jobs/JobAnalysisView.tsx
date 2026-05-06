@@ -152,7 +152,7 @@ export function JobAnalysisView({ analysis }: { analysis: JobAnalysis }) {
             <TextList values={analysis.strengths} emptyText="No strengths detected." />
           </div>
         </section>
-        <CollapsibleSection title="Concerns">
+        <CollapsibleSection title="Concerns" defaultOpen={concerns.length > 0}>
           <TextList values={concerns} emptyText="No concerns detected." />
         </CollapsibleSection>
       </div>

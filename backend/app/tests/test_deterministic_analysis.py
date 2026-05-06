@@ -1,6 +1,8 @@
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 from app.models.job_analysis import AuthorizationRisk, NewGradFitLabel
+from app.schemas.analysis import JobAnalysisRead
 from app.services.resume_tailoring_service import ResumeTailoringService
 from app.services.analysis.deterministic_provider import DeterministicRuleBasedProvider
 from app.services.analysis.evidence import dedupe_evidence, extract_sentence_evidence, phrase_window
@@ -44,7 +46,8 @@ def test_healthcare_product_context_creates_domain_signal() -> None:
 def test_backend_systems_posting_extracts_specific_backend_signals_without_node_false_positive() -> None:
     description = (
         "What You'll Do: Design scalable backend services using Go and C++. "
-        "Distributed systems, API design, observability, and production debugging."
+        "Distributed systems, API design, observability, and production debugging. "
+        "We believe in the power of single node databases."
     )
 
     result = DeterministicRuleBasedProvider().analyze(profile=make_profile(), job=make_job(description))
@@ -62,15 +65,81 @@ def test_backend_systems_posting_extracts_specific_backend_signals_without_node_
     assert "Node.js" not in extracted
 
 
+def test_explicit_nodejs_api_extracts_nodejs() -> None:
+    description = "Requirements: Build a Node.js API with PostgreSQL."
+
+    required_skills, _preferred_skills, _evidence = extract_skills_by_requirement(description)
+
+    assert "Node.js" in required_skills
+
+
 def test_senior_high_ownership_role_generates_concerns() -> None:
-    description = "About the Role: Small, senior team. High ownership. Work directly with CTO."
+    description = (
+        "About the Role: Small, senior team. High ownership. Work directly with CTO. "
+        "Requirements: API design, event-driven systems, async processing, MongoDB, CI/CD."
+    )
 
     result = DeterministicRuleBasedProvider().analyze(profile=make_profile(), job=make_job(description))
     concern_text = " ".join(result.concerns).lower()
 
     assert result.new_grad_fit_label in {"not_new_grad_friendly", "weak_fit"}
     assert result.concerns
-    assert "senior" in concern_text or "ownership" in concern_text or "new-grad" in concern_text
+    assert "senior-level or high-experience signals" in concern_text
+    assert "seniority, ownership, or high-agency expectations" in concern_text
+    assert "missing technical skills detected" in concern_text
+    assert "api design" in concern_text
+    assert "event-driven systems" in concern_text
+    assert "async processing" in concern_text
+    assert "mongodb" in concern_text
+    assert "ci/cd" in concern_text
+    assert "work authorization requirements are unclear" in concern_text
+
+
+def test_job_analysis_read_exposes_concerns() -> None:
+    now = datetime.now(timezone.utc)
+    analysis = SimpleNamespace(
+        id=1,
+        job_id=2,
+        user_id=3,
+        parsed_title="Backend Engineer",
+        parsed_company="Example",
+        parsed_locations=[],
+        employment_type=None,
+        seniority_signals=[],
+        required_skills=[],
+        preferred_skills=[],
+        experience_requirements=[],
+        overall_score=20,
+        new_grad_fit_score=15,
+        resume_match_score=20,
+        required_skill_score=20,
+        preferred_skill_score=20,
+        experience_fit_score=15,
+        location_fit_score=60,
+        new_grad_fit_label="not_new_grad_friendly",
+        authorization_risk="unknown",
+        recommendation="skip",
+        recommendation_reason="Not new-grad friendly.",
+        summary="Summary",
+        strengths=[],
+        concerns=["This role shows senior-level or high-experience signals that may not be new-grad friendly."],
+        missing_required_skills=[],
+        missing_preferred_skills=[],
+        new_grad_positive_signals=[],
+        new_grad_negative_signals=[],
+        authorization_evidence=[],
+        evidence=[],
+        next_actions=[],
+        analysis_provider="deterministic_rule_based",
+        analysis_confidence=0.8,
+        fallback_used=False,
+        created_at=now,
+        updated_at=now,
+    )
+
+    result = JobAnalysisRead.model_validate(analysis)
+
+    assert result.concerns == analysis.concerns
 
 
 def test_range_experience_does_not_trigger_plus_year_signal() -> None:

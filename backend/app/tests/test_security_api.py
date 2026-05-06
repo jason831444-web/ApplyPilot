@@ -414,6 +414,40 @@ def test_resume_tailoring_uses_matched_skills_and_cautions_without_claiming_miss
     assert "work authorization" in caution_text or "sponsorship" in caution_text
 
 
+def test_analysis_concerns_survive_persist_and_readback() -> None:
+    token = register_and_login("analysis-concerns")
+    update_profile_for_tailoring(token)
+    response = client.post(
+        "/api/jobs/analyze-new",
+        headers=auth_headers(token),
+        json={
+            "company_name": "Concern Corp",
+            "job_title": "Founding Engineer",
+            "location": "New York",
+            "job_description": (
+                "About the Role: Small, senior team. High ownership. Work directly with CTO. "
+                "Requirements: API design, event-driven systems, async processing, MongoDB, CI/CD."
+            ),
+            "source_url": None,
+            "source_type": "manual",
+        },
+    )
+    assert response.status_code == 201
+    data = response.json()
+    job_id = data["job"]["id"]
+    created_concerns = data["analysis"]["concerns"]
+
+    read_response = client.get(f"/api/jobs/{job_id}/analysis", headers=auth_headers(token))
+
+    assert read_response.status_code == 200
+    read_concerns = read_response.json()["concerns"]
+    assert created_concerns == read_concerns
+    assert any("senior-level or high-experience signals" in concern for concern in read_concerns)
+    assert any("seniority, ownership, or high-agency expectations" in concern for concern in read_concerns)
+    assert any("Missing technical skills detected: API Design, Event-driven Systems, Async Processing, MongoDB, CI/CD." == concern for concern in read_concerns)
+    assert any("Work authorization requirements are unclear" in concern for concern in read_concerns)
+
+
 def test_application_csv_export_requires_auth() -> None:
     response = client.get("/api/applications/export.csv")
 
