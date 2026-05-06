@@ -247,7 +247,7 @@ class DeterministicRuleBasedProvider:
             concerns.append(sparse_concern)
         if not has_clean_skill_sections and technical_skill_count <= 2:
             concerns.append(sparse_concern)
-        missing_technical_skills = self._dedupe_text(missing_required_skills + missing_preferred_skills)
+        missing_technical_skills = self._dedupe_text(missing_required_skills)
         if missing_technical_skills:
             concerns.append(f"Missing technical skills detected: {', '.join(missing_technical_skills[:8])}.")
         if new_grad_fit_label == "not_new_grad_friendly":

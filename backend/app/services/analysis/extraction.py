@@ -206,6 +206,7 @@ def first_skill_match(skill: str, text: str) -> re.Match[str] | None:
 
 
 def extract_experience_signals(text: str) -> tuple[list[dict], list[dict], list[dict]]:
+    text = suppress_senior_collaboration_context(text)
     all_signals: list[dict] = []
     positive: list[dict] = []
     negative: list[dict] = []
@@ -227,6 +228,20 @@ def extract_experience_signals(text: str) -> tuple[list[dict], list[dict], list[
     positive = [signal for signal in all_signals if signal.get("polarity") == "positive"]
     negative = [signal for signal in all_signals if signal.get("polarity") == "negative"]
     return all_signals, positive, negative
+
+
+def suppress_senior_collaboration_context(text: str) -> str:
+    patterns = [
+        r"\bcollaborat(?:e|ing)\s+with\s+senior\s+(?:developers|engineers|team members)(?:\s+and\s+other\s+team members)?",
+        r"\bwork(?:ing)?\s+with\s+senior\s+(?:developers|engineers|team members)(?:\s+and\s+other\s+team members)?",
+        r"\bsenior\s+(?:developers|engineers)\s+and\s+other\s+team members",
+        r"\bsenior\s+team members",
+        r"\blearn\s+from\s+senior\s+(?:developers|engineers)",
+    ]
+    sanitized = text
+    for pattern in patterns:
+        sanitized = re.sub(pattern, "collaborate with team members", sanitized, flags=re.IGNORECASE)
+    return sanitized
 
 
 def should_skip_experience_signal(label: str, text: str, match: re.Match[str]) -> bool:

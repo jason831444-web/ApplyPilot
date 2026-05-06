@@ -86,10 +86,15 @@ class JobAnalysisRead(BaseModel):
         return unique_strings(
             [
                 skill
-                for skill in self.missing_required_skills + self.missing_preferred_skills
+                for skill in self.missing_required_skills
                 if skill not in DOMAIN_SIGNAL_LABELS
             ]
         )
+
+    @computed_field
+    @property
+    def missing_preferred_technical_skills(self) -> list[str]:
+        return unique_strings([skill for skill in self.missing_preferred_skills if skill not in DOMAIN_SIGNAL_LABELS])
 
     @computed_field
     @property

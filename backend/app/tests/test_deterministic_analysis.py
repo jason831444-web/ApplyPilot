@@ -207,8 +207,12 @@ def test_junior_python_role_ignores_senior_collaboration_context_and_extracts_da
     extracted = set(result.required_skills + result.preferred_skills)
     negative_labels = {str(signal.get("label", "")) for signal in result.new_grad_negative_signals}
     positive_labels = {str(signal.get("label", "")) for signal in result.new_grad_positive_signals}
+    seniority_text = " ".join(str(signal.get("text", "")).lower() for signal in result.seniority_signals)
+    concern_text = " ".join(result.concerns).lower()
 
     assert "senior" not in negative_labels
+    assert "collaborate with senior developers" not in seniority_text
+    assert "ownership" not in concern_text
     assert {"junior", "eager to learn", "mentorship"} <= positive_labels
     assert result.new_grad_fit_label != "not_new_grad_friendly"
     assert result.recommendation != "skip"
@@ -237,15 +241,26 @@ def test_senior_collaboration_context_is_not_negative_or_ownership_concern() -> 
 
     result = DeterministicRuleBasedProvider().analyze(profile=make_profile(), job=make_job(description))
     negative_labels = {str(signal.get("label", "")) for signal in result.new_grad_negative_signals}
+    evidence_text = " ".join(str(item.get("text", "")).lower() for item in result.evidence)
     concern_text = " ".join(result.concerns).lower()
 
     assert "senior" not in negative_labels
     assert "senior team" not in negative_labels
+    assert "collaborate with senior developers" not in evidence_text
     assert "ownership" not in concern_text
 
 
+def test_true_senior_engineer_signal_still_appears() -> None:
+    description = "We are hiring a Senior Software Engineer. Requirements: Python."
+
+    result = DeterministicRuleBasedProvider().analyze(profile=make_profile(), job=make_job(description))
+    negative_labels = {str(signal.get("label", "")) for signal in result.new_grad_negative_signals}
+
+    assert "senior" in negative_labels
+
+
 def test_preferred_cloud_skills_are_not_required_missing() -> None:
-    description = "Requirements: Python. Preferred Qualifications: AWS, Azure."
+    description = "Requirements: Python. Preferred Qualifications: Knowledge of containerization tools such as Docker and cloud environments AWS, Azure."
 
     result = DeterministicRuleBasedProvider().analyze(profile=make_profile(), job=make_job(description))
 
@@ -255,6 +270,55 @@ def test_preferred_cloud_skills_are_not_required_missing() -> None:
     assert "Azure" not in result.required_skills
     assert "AWS" not in result.missing_required_skills
     assert "Azure" not in result.missing_required_skills
+    assert "Azure" in result.missing_preferred_skills
+
+
+def test_schema_missing_technical_skills_excludes_preferred_only_gaps() -> None:
+    now = datetime.now(timezone.utc)
+    analysis = SimpleNamespace(
+        id=1,
+        job_id=2,
+        user_id=3,
+        parsed_title="Junior Engineer",
+        parsed_company="Example",
+        parsed_locations=[],
+        employment_type=None,
+        seniority_signals=[],
+        required_skills=["Python"],
+        preferred_skills=["AWS", "Azure"],
+        experience_requirements=[],
+        overall_score=70,
+        new_grad_fit_score=70,
+        resume_match_score=70,
+        required_skill_score=100,
+        preferred_skill_score=50,
+        experience_fit_score=70,
+        location_fit_score=60,
+        new_grad_fit_label="good_fit",
+        authorization_risk="unknown",
+        recommendation="maybe",
+        recommendation_reason="Mixed.",
+        summary="Summary",
+        strengths=[],
+        concerns=[],
+        missing_required_skills=[],
+        missing_preferred_skills=["Azure"],
+        new_grad_positive_signals=[],
+        new_grad_negative_signals=[],
+        authorization_evidence=[],
+        evidence=[],
+        next_actions=[],
+        analysis_provider="deterministic_rule_based",
+        analysis_confidence=0.8,
+        fallback_used=False,
+        created_at=now,
+        updated_at=now,
+    )
+
+    result = JobAnalysisRead.model_validate(analysis)
+
+    assert result.missing_technical_skills == []
+    assert result.missing_preferred_technical_skills == ["Azure"]
 
 
 def test_forward_deployed_role_avoids_leading_venture_false_positive_and_extracts_context() -> None:

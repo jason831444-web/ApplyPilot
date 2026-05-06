@@ -135,12 +135,12 @@ export function JobAnalysisView({ analysis }: { analysis: JobAnalysis }) {
         <div className="mt-5">
           <MissingSkills
             required={analysis.missing_technical_skills ?? analysis.missing_required_skills}
-            preferred={analysis.missing_domain_signals ?? []}
+            preferred={analysis.missing_preferred_technical_skills ?? analysis.missing_preferred_skills}
             skillGapNote={analysis.skill_gap_note}
             technicalSkillCount={technicalSkills.length}
             hasDomainSignals={domainSignals.length > 0}
             requiredLabel="Missing Technical Skills"
-            preferredLabel="Missing Domain Signals"
+            preferredLabel="Preferred Keywords To Consider"
           />
         </div>
       </section>
