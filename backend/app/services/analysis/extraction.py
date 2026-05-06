@@ -5,10 +5,14 @@ from app.services.analysis.rules import (
     AUTHORIZATION_HIGH_PATTERNS,
     AUTHORIZATION_MEDIUM_PATTERNS,
     AUTHORIZATION_POSITIVE_PATTERNS,
+    BENEFITS_SECTION_PATTERNS,
     DOMAIN_SIGNAL_LABELS,
     EXPERIENCE_RULES,
+    INTERVIEW_SECTION_PATTERNS,
+    LEGAL_SECTION_PATTERNS,
     PREFERRED_SECTION_PATTERNS,
     REQUIRED_SECTION_PATTERNS,
+    ROLE_SECTION_PATTERNS,
     SKILL_PATTERNS,
 )
 
@@ -47,8 +51,11 @@ def split_sections(text: str) -> list[tuple[str, str]]:
 def split_inline_sections(text: str) -> list[tuple[str, str]]:
     heading_pattern = re.compile(
         r"(?i)\b("
+        r"about the role|what you'll do|what you will do|responsibilities|our stack|tools for the job|tech stack|"
         r"preferred qualifications?|minimum qualifications?|basic qualifications?|"
-        r"nice to have|what you need|requirements?|qualifications?|required|preferred|bonus"
+        r"nice to have|what you need|requirements?|qualifications?|required|preferred|bonus|"
+        r"benefits?|what we offer|compensation|perks?|equal opportunity|eeo|legal|"
+        r"interview process|hiring process|recruiting process"
         r")\s*:"
     )
     matches = list(heading_pattern.finditer(text))
@@ -72,16 +79,26 @@ def split_inline_sections(text: str) -> list[tuple[str, str]]:
 
 
 def section_kind(heading: str) -> str:
+    if any(re.search(pattern, heading, re.IGNORECASE) for pattern in BENEFITS_SECTION_PATTERNS):
+        return "excluded"
+    if any(re.search(pattern, heading, re.IGNORECASE) for pattern in LEGAL_SECTION_PATTERNS):
+        return "excluded"
+    if any(re.search(pattern, heading, re.IGNORECASE) for pattern in INTERVIEW_SECTION_PATTERNS):
+        return "excluded"
     if any(re.search(pattern, heading, re.IGNORECASE) for pattern in PREFERRED_SECTION_PATTERNS):
         return "preferred"
     if any(re.search(pattern, heading, re.IGNORECASE) for pattern in REQUIRED_SECTION_PATTERNS):
         return "required"
+    if any(re.search(pattern, heading, re.IGNORECASE) for pattern in ROLE_SECTION_PATTERNS):
+        return "role"
     return "general"
 
 
-def find_skills(text: str) -> list[str]:
+def find_skills(text: str, *, include_domain_signals: bool = True) -> list[str]:
     found: list[tuple[int, int, str]] = []
     for index, (skill, patterns) in enumerate(SKILL_PATTERNS.items()):
+        if not include_domain_signals and skill in DOMAIN_SIGNAL_LABELS:
+            continue
         starts = [
             match.start()
             for pattern in patterns
@@ -97,20 +114,24 @@ def extract_skills_by_requirement(text: str) -> tuple[list[str], list[str], list
     preferred: list[str] = []
     evidence: list[dict] = []
     has_clean_skill_sections = False
+    relevant_sections: list[str] = []
 
     for heading, body in split_sections(text):
-        skills = find_skills(body)
+        kind = section_kind(heading)
+        include_domains = kind != "excluded"
+        skills = find_skills(body, include_domain_signals=include_domains)
+        if include_domains:
+            relevant_sections.append(body)
         if not skills:
             continue
         technical_skills = [skill for skill in skills if skill not in DOMAIN_SIGNAL_LABELS]
-        kind = section_kind(heading)
         if kind in {"required", "preferred"}:
             has_clean_skill_sections = True
         if kind == "preferred":
             preferred.extend(technical_skills)
         elif kind == "required":
             required.extend(technical_skills)
-        else:
+        elif kind in {"general", "role"}:
             paragraph_hits = re.split(r"(?<=[.!?])\s+|\n+", body)
             for paragraph in paragraph_hits:
                 if re.search(r"\b(require|required|qualification|must have|need|experience with)\b", paragraph, re.IGNORECASE):
@@ -122,11 +143,15 @@ def extract_skills_by_requirement(text: str) -> tuple[list[str], list[str], list
             evidence.append(make_evidence(evidence_type_for_skill(skill), skill, evidence_text))
 
     if not has_clean_skill_sections:
-        all_skills = find_skills(text)
+        relevant_text = "\n".join(relevant_sections) if relevant_sections else text
+        technical_skills = find_skills(text, include_domain_signals=False)
+        domain_signals = find_skills(relevant_text, include_domain_signals=True)
+        all_skills = unique_preserve(technical_skills + [skill for skill in domain_signals if skill in DOMAIN_SIGNAL_LABELS])
         required = [skill for skill in all_skills if skill not in DOMAIN_SIGNAL_LABELS]
         for skill in all_skills:
-            match = first_skill_match(skill, text)
-            evidence_text = phrase_window(text, match.start(), match.end()) if match else skill
+            source_text = relevant_text if skill in DOMAIN_SIGNAL_LABELS else text
+            match = first_skill_match(skill, source_text)
+            evidence_text = phrase_window(source_text, match.start(), match.end()) if match else skill
             evidence.append(make_evidence(evidence_type_for_skill(skill), skill, evidence_text))
 
     required = unique_preserve(required)

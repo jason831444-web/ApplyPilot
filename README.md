@@ -1,99 +1,211 @@
 # ApplyPilot
 
-ApplyPilot is a full-stack job-fit decision engine for new-grad software engineering candidates.
+ApplyPilot is a full-stack New-Grad Job-Fit Engine that helps candidates evaluate job postings against their profile using deterministic rules instead of relying on an LLM for core matching.
 
-It is not a generic job tracker. ApplyPilot helps a candidate decide whether a job is worth applying to by analyzing the job description, comparing it against the candidate profile, surfacing sponsorship risk, and turning the result into an explainable recommendation.
+It turns a pasted job description and a structured candidate profile into explainable scores, missing-skill feedback, work authorization risk, resume tailoring suggestions, application tracking, and dashboard analytics.
+
+- Compare jobs against resume text, skills, projects, target roles, locations, graduation date, and work authorization notes.
+- Score postings across new-grad fit, skill match, experience fit, location fit, resume match, and authorization risk.
+- Surface actionable outputs: recommendation, missing skills, evidence, next actions, resume tailoring, and portfolio-level analytics.
+- Re-run all saved analyses after profile changes so stored scores and dashboards stay consistent with the latest profile.
 
 ## Live Demo
 
-Frontend:
-https://applypilot-web.vercel.app
+Frontend: https://applypilot-web.vercel.app
 
-Backend Health Check:
-https://applypilot-backend-nrtx.onrender.com/health
+Backend health check: https://applypilot-backend-nrtx.onrender.com/health
 
-Demo Account:
+Demo account:
 
 - Email: `demo@applypilot.dev`
 - Password: `password123`
 
-Note: the backend is hosted on a free Render instance, so the first request may take up to 50 seconds if the server is sleeping.
+The backend is hosted on a free Render instance, so the first request may take several seconds if the server is sleeping.
 
 ## Problem
 
-New-grad candidates often apply to hundreds of roles without knowing which postings are realistic, which require senior experience, which hide sponsorship risk, or which skills are actually missing. Traditional job trackers store status, but they do not help candidates decide where to spend effort.
+New-grad candidates often apply to large numbers of roles without a structured way to decide which postings are realistic. Job descriptions mix required skills, preferred qualifications, seniority signals, sponsorship language, and vague responsibilities in inconsistent formats.
 
-## Why I Built This
+This creates three practical problems:
 
-I built ApplyPilot to model the kind of decision support a serious job seeker needs: profile-aware job analysis, new-grad suitability checks, work authorization risk detection, application tracking, and a dashboard that turns search activity into next actions.
+- Search effort is inefficient because candidates cannot quickly separate strong-fit roles from low-probability roles.
+- Traditional application trackers store status but do not evaluate whether a job matches the candidate's profile.
+- Resume mismatch is hard to diagnose because candidates may not know which skills or signals a posting expects.
 
 ## Solution
 
-ApplyPilot lets a user:
+ApplyPilot provides a deterministic job-fit engine built around a structured candidate profile and explainable scoring rules.
 
-- Create a resume/profile with skills, projects, target roles, target locations, graduation date, and work authorization notes
-- Paste a job description
-- Run deterministic job analysis without paid AI APIs
-- Review required skills, preferred skills, seniority signals, sponsorship evidence, missing skills, and match scores
-- Get an `Apply`, `Apply with Caution`, `Maybe`, or `Skip` recommendation
-- Track the application pipeline
-- Review dashboard analytics and next recommended actions
+The system parses job descriptions, extracts hiring signals, compares them against profile data, and stores an analysis record for each job. Instead of producing a black-box response, it returns concrete outputs:
+
+- Multi-factor scores for skill match, resume match, new-grad fit, experience fit, location fit, and authorization risk.
+- Missing required and preferred skills with confidence-aware messaging.
+- Evidence-backed recommendations: `apply`, `apply_with_caution`, `maybe`, or `skip`.
+- Deterministic resume tailoring suggestions based on the saved job analysis and current profile.
 
 ## Core Features
 
-- JWT authentication
-- Resume/profile management
-- Job creation and detail views
-- Deterministic job analysis engine
-- New-grad fit scoring
-- Sponsorship and work authorization risk detection
-- Resume-to-job skill matching
-- Application tracking and status editing
-- Dashboard analytics
-- Demo seed data
-- Docker Compose local stack
+### Profile System
 
-## Demo Account
+- Stores resume text plus structured fields for skills, projects, experience summary, target roles, target locations, graduation date, and work authorization notes.
+- Uses work authorization notes when evaluating sponsorship or visa-related risk in job descriptions.
+- Provides a single profile source of truth for job scoring, dashboard analytics, and resume tailoring.
 
-The live demo and local seed data use:
+### Resume Import
 
-- Email: `demo@applypilot.dev`
-- Password: `password123`
+- Imports text-based PDF resumes without OCR and without external AI APIs.
+- Extracts resume text and section-aware suggestions for skills, projects, and experience summary.
+- Keeps import suggestions reviewable before saving them into the profile.
 
-Seed command:
+### Job Analysis Engine
 
-```bash
-docker compose exec backend python -m app.seed
+ApplyPilot analyzes jobs through deterministic rules and scoring logic. Scores include:
+
+- Required skills
+- Preferred skills
+- Resume match
+- Experience fit
+- Location fit
+- New-grad fit
+- Authorization risk
+
+The engine extracts structured requirements, seniority signals, domain signals, sponsorship language, and evidence snippets from the job posting. It then compares those signals against the user's profile and stores the resulting analysis.
+
+### Missing Skills Detection
+
+- Detects missing required and preferred skills by comparing extracted job skills against profile text, structured skills, projects, and experience summary.
+- Uses confidence-aware messaging when job postings contain sparse or ambiguous technical requirements.
+- Avoids presenting sparse postings as if they have no missing skills simply because little structured signal was detected.
+
+### Resume Tailoring
+
+- Generates deterministic suggestions based on the current profile, job posting, and stored analysis.
+- Highlights skills to emphasize, keywords to add, project angles, tailored summary guidance, and cautions.
+- Avoids suggesting the user claim missing skills as existing experience.
+
+### Application Tracking
+
+- Tracks application status across the job-search pipeline.
+- Supports notes, applied dates, next actions, and next action dates.
+- Keeps application records scoped to the authenticated user.
+
+### Dashboard & Analytics
+
+- Aggregates application and analysis data into dashboard summaries.
+- Surfaces status distribution, recommendation breakdowns, missing-skill trends, upcoming follow-ups, and best opportunities.
+- Updates automatically from stored analysis rows after jobs are reanalyzed.
+
+### CSV Export
+
+- Exports applications with related job and analysis data.
+- Includes analysis columns such as recommendation, overall score, new-grad fit label, and authorization risk.
+
+### Reanalysis Flow
+
+- Profile changes can affect existing job scores, missing skills, dashboard analytics, and resume tailoring.
+- After a successful profile save, the UI shows a callout prompting the user to re-run saved analyses.
+- The `Re-run All Analyses` action recomputes all jobs owned by the current user and updates or creates analysis rows.
+- This keeps the system consistent without automatically running a potentially expensive operation on every profile save.
+
+## System Architecture
+
+ApplyPilot is organized as a three-tier full-stack application:
+
+- Frontend: Next.js App Router, React, TypeScript, Tailwind CSS.
+- Backend: FastAPI with service and repository layers.
+- Database: PostgreSQL managed through SQLAlchemy models and Alembic migrations.
+
+High-level flow:
+
+```text
+User Profile -> Job Input -> Analysis Engine -> Stored Analysis -> UI
 ```
 
-The seed is idempotent. Running it multiple times updates the same demo user, jobs, profile, applications, and analyses without duplicating demo records.
+Detailed flow:
 
-## Recommended Demo Flow
+1. The user creates or updates a profile with resume text and structured fields.
+2. The user saves or analyzes a job posting.
+3. The FastAPI backend runs the deterministic analysis engine.
+4. The backend upserts a `JobAnalysis` row linked to the authenticated user's job.
+5. The frontend renders scores, evidence, missing skills, recommendations, tailoring suggestions, and dashboard analytics from stored data.
 
-1. Open the live frontend: https://applypilot-web.vercel.app
-2. Log in with the demo account.
-3. Open Dashboard to see job-search analytics.
-4. Open Jobs to review seeded job postings.
-5. Open a job detail page to review recommendation, match score, new-grad fit, authorization risk, missing skills, evidence, and next actions.
-6. Open Applications to review the application pipeline.
-7. Try Add Job by pasting a new job description.
-8. Return to Dashboard to see updated analytics.
+## Backend Structure
+
+```text
+backend/app
+  api/routes        FastAPI route handlers and request boundaries
+  core              settings, database, security, shared exceptions
+  models            SQLAlchemy models
+  repositories      database access and persistence operations
+  schemas           Pydantic request and response schemas
+  services          business logic and workflow orchestration
+  services/analysis deterministic analysis provider and scoring logic
+```
+
+Important services:
+
+- `ProfileService`: profile creation and updates.
+- `JobService`: job CRUD, analyze-new flow, single-job reanalysis, and reanalyze-all flow.
+- `ApplicationService`: pipeline tracking and ownership checks.
+- `DashboardService`: aggregate analytics.
+- `ResumeTailoringService`: deterministic tailoring suggestions.
+- `JobAnalyzer`: provider coordinator for analysis.
+- `DeterministicRuleBasedProvider`: no-LLM core analysis provider.
+
+## Key Engineering Decisions
+
+### Deterministic Analysis Instead Of LLM Dependency
+
+Core matching uses deterministic parsing and scoring rather than an external LLM. This keeps analysis explainable, testable, cheaper to run, and reliable in local development or demo environments.
+
+### Confidence-Aware Parsing
+
+The engine distinguishes between strong extracted requirements and sparse job descriptions. This prevents misleading outputs such as treating a low-signal posting as a complete skill match.
+
+### Section-Aware Resume Extraction
+
+Resume import uses section-aware parsing to identify technical skills, projects, and summary material from text-based PDFs. The import flow suggests profile changes but leaves final control with the user.
+
+### Layered Backend Design
+
+Routes handle API boundaries, services hold business workflows, and repositories own database access. This keeps authentication, ownership checks, scoring, and persistence easier to test independently.
+
+### Upsert-Based Analysis Storage
+
+Job analysis is stored with upsert behavior. Reanalysis updates existing `JobAnalysis` rows and creates missing rows, which lets dashboards, job views, resume tailoring, and CSV exports all read from the same durable analysis source.
+
+## Example Flow: Profile Change Reanalysis
+
+1. A user updates their profile after adding new skills from a resume PDF.
+2. The user saves the profile.
+3. ApplyPilot shows: `Your profile changed. Re-run analysis for all saved jobs to update scores and recommendations.`
+4. The user clicks `Re-run All Analyses`.
+5. The backend processes only jobs owned by that user through `POST /api/jobs/reanalyze-all`.
+6. Existing analyses are updated and missing analyses are created.
+7. Dashboard analytics, job scores, missing skills, and resume tailoring reflect the updated profile.
 
 ## Screenshots
 
-Planned portfolio screenshots:
+Portfolio screenshots can be added here:
 
-- Dashboard
-- Job analysis detail
-- Add job flow
-- Application pipeline
-- Profile editor
+### Dashboard
+
+![Dashboard screenshot placeholder](docs/screenshots/dashboard.png)
+
+### Job Analysis View
+
+![Job analysis screenshot placeholder](docs/screenshots/job-analysis.png)
+
+### Profile Page
+
+![Profile page screenshot placeholder](docs/screenshots/profile.png)
 
 ## Tech Stack
 
 Frontend:
 
 - Next.js App Router
+- React
 - TypeScript
 - Tailwind CSS
 - Recharts
@@ -108,96 +220,17 @@ Backend:
 - JWT authentication
 - Passlib bcrypt password hashing
 
-Local development:
+Infrastructure:
 
+- Docker
 - Docker Compose
+- Render backend deployment
+- Vercel frontend deployment
+- Neon PostgreSQL for hosted database
 
-## Architecture Overview
+## Setup Instructions
 
-```text
-ApplyPilot
-  backend
-    app
-      api/routes        FastAPI route handlers
-      core              settings, database, security, exceptions
-      models            SQLAlchemy models
-      repositories      database access
-      schemas           Pydantic request/response schemas
-      services          business logic
-      services/analysis deterministic analysis provider
-      seed.py           idempotent demo seed script
-    alembic             migrations
-  frontend
-    app                 Next.js App Router pages
-    components          UI and feature components
-    hooks               auth hook/provider
-    lib                 API client, types, format helpers
-  docker-compose.yml
-```
-
-## Backend Service Structure
-
-- `AuthService`: registration, login, JWT token creation
-- `ProfileService`: authenticated profile creation and updates
-- `JobService`: job CRUD, analyze-new flow, analysis reruns
-- `ApplicationService`: pipeline tracking, ownership checks, status editing
-- `DashboardService`: aggregate analytics and recommended next actions
-- `JobAnalyzer`: provider coordinator
-- `DeterministicRuleBasedProvider`: no-paid-AI analysis provider
-
-## Analysis Pipeline
-
-The deterministic analysis engine:
-
-1. Splits the job description into requirement and preferred sections.
-2. Extracts canonical skills from a curated skill dictionary.
-3. Detects experience and seniority signals such as `0-2 years`, `junior`, `senior`, and `5+ years`.
-4. Detects sponsorship and work authorization language.
-5. Compares extracted job skills against the user's profile, resume text, projects, and experience summary.
-6. Computes skill, resume, experience, location, authorization, and overall scores.
-7. Generates strengths, concerns, evidence, missing skills, next actions, and a recommendation.
-
-The system is provider-based so future `OpenAIAnalysisProvider`, `LocalLLMAnalysisProvider`, or `HybridAnalysisProvider` implementations can be added without rewriting the app flow.
-
-## Scoring And Recommendation Logic
-
-Scores include:
-
-- Required skill score
-- Preferred skill score
-- Resume match score
-- Experience fit score
-- Location fit score
-- New-grad fit score
-- Overall score
-
-Overall score weights:
-
-- Required skills: 35%
-- Preferred skills: 15%
-- Experience fit: 20%
-- Resume match: 15%
-- Location fit: 10%
-- Authorization adjustment: 5%
-
-Recommendation values:
-
-- `apply`
-- `apply_with_caution`
-- `maybe`
-- `skip`
-
-The recommendation considers overall score, new-grad suitability, missing required skills, authorization evidence, and whether the user's profile suggests OPT, CPT, F-1, visa, or future sponsorship needs.
-
-## Database Models
-
-- `User`: account identity and hashed password
-- `Profile`: resume text, skills, projects, targets, graduation date, work authorization notes
-- `Job`: job posting data and source metadata
-- `Application`: user-specific pipeline status, applied date, notes, next action
-- `JobAnalysis`: parsed job data, scores, decision fields, evidence, and metadata
-
-## Local Development Setup
+### Docker Setup
 
 Copy environment examples if desired:
 
@@ -213,13 +246,7 @@ Start the full stack:
 docker compose up --build
 ```
 
-Open:
-
-- Frontend: http://localhost:3000
-- Backend: http://localhost:8000
-- Health check: http://localhost:8000/health
-
-Run migrations:
+Run database migrations:
 
 ```bash
 docker compose exec backend alembic upgrade head
@@ -231,21 +258,13 @@ Seed demo data:
 docker compose exec backend python -m app.seed
 ```
 
-## Full Docker Mode
+Open:
 
-```bash
-docker compose up --build -d
-docker compose exec backend alembic upgrade head
-docker compose exec backend python -m app.seed
-```
+- Frontend: http://localhost:3000
+- Backend: http://localhost:8000
+- Health check: http://localhost:8000/health
 
-Verify:
-
-```bash
-curl http://localhost:8000/health
-```
-
-## Hybrid Development Mode
+### Backend Run
 
 Use Docker for PostgreSQL:
 
@@ -253,7 +272,7 @@ Use Docker for PostgreSQL:
 docker compose up -d postgres
 ```
 
-Run backend locally:
+Run the backend locally:
 
 ```bash
 cd backend
@@ -264,7 +283,7 @@ alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
-Run frontend locally:
+### Frontend Run
 
 ```bash
 cd frontend
@@ -274,7 +293,7 @@ npm run dev
 
 ## Environment Variables
 
-Root/backend:
+Backend:
 
 ```bash
 APP_ENV=development
@@ -294,15 +313,6 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api
 
 `BACKEND_CORS_ORIGINS` and `CORS_ORIGINS` are both supported for backend CORS configuration. They may be JSON arrays or comma-separated strings.
 
-## Security Notes
-
-- The MVP currently stores JWTs in `localStorage` for development simplicity.
-- For production hardening, migrate auth to `httpOnly`, `Secure`, `SameSite` cookies and add CSRF protection where appropriate.
-- Avoid rendering user-provided HTML. ApplyPilot displays user/job text as plain text.
-- All backend product routes are authenticated and scoped to the current user.
-- `SECRET_KEY`, `ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES`, `DATABASE_URL`, and CORS origins are read from environment variables.
-- Keep real `.env` files out of version control; use `.env.example` as documentation only.
-
 ## API Quick Reference
 
 Auth:
@@ -315,6 +325,7 @@ Profile:
 
 - `GET /api/profile/me`
 - `PUT /api/profile/me`
+- `POST /api/profile/upload-resume`
 
 Jobs:
 
@@ -326,6 +337,8 @@ Jobs:
 - `DELETE /api/jobs/{job_id}`
 - `POST /api/jobs/{job_id}/analyze`
 - `GET /api/jobs/{job_id}/analysis`
+- `GET /api/jobs/{job_id}/resume-tailoring`
+- `POST /api/jobs/reanalyze-all`
 
 Applications:
 
@@ -334,174 +347,13 @@ Applications:
 - `GET /api/applications/{application_id}`
 - `PATCH /api/applications/{application_id}`
 - `DELETE /api/applications/{application_id}`
+- `GET /api/applications/export.csv`
 
 Dashboard:
 
 - `GET /api/dashboard/summary`
 
-## Useful Curl Examples
-
-Login:
-
-```bash
-curl -X POST http://localhost:8000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"demo@applypilot.dev","password":"password123"}'
-```
-
-Read dashboard:
-
-```bash
-curl http://localhost:8000/api/dashboard/summary \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-Analyze a new job:
-
-```bash
-curl -X POST http://localhost:8000/api/jobs/analyze-new \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "company_name": "Example Corp",
-    "job_title": "New Grad Software Engineer",
-    "location": "Remote",
-    "job_description": "Requirements: 0-2 years, Python, React, SQL. Preferred: Docker, AWS.",
-    "source_url": null,
-    "source_type": "manual"
-  }'
-```
-
-Update application status:
-
-```bash
-curl -X PATCH http://localhost:8000/api/applications/1 \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"status":"applied","next_action":"Follow up","next_action_date":"2026-05-08"}'
-```
-
-## Deployment Guide
-
-Current production deployment:
-
-- Database: Neon PostgreSQL
-- Backend: Render Web Service, https://applypilot-backend-nrtx.onrender.com
-- Backend Health Check: https://applypilot-backend-nrtx.onrender.com/health
-- Frontend: Vercel, https://applypilot-web.vercel.app
-
-### Neon PostgreSQL
-
-1. Create a Neon project.
-2. Copy the pooled or direct PostgreSQL connection string.
-3. Use a SQLAlchemy-compatible PostgreSQL URL in Render's `DATABASE_URL`.
-4. If Neon includes `sslmode=require`, keep it in the connection string.
-5. Run Alembic migrations through the Render start command or Render Shell.
-
-Example Neon URL shape:
-
-```bash
-postgresql+psycopg://USER:PASSWORD@HOST.neon.tech/DBNAME?sslmode=require
-```
-
-### Render Backend Settings
-
-Create a Render Web Service:
-
-- Root Directory: `backend`
-- Runtime: `Python`
-- Build Command: `pip install -r requirements.txt`
-- Start Command: `alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-
-Alternatively, use the included helper:
-
-```bash
-./render-start.sh
-```
-
-Render environment variables:
-
-```bash
-APP_ENV=production
-DATABASE_URL=<Neon PostgreSQL connection string>
-SECRET_KEY=<generate a long random secret>
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=1440
-CORS_ORIGINS=http://localhost:3000,https://applypilot-web.vercel.app
-```
-
-After the first successful backend deploy, seed demo data from Render Shell:
-
-```bash
-python -m app.seed
-```
-
-You can also run the seed command locally against the production `DATABASE_URL`, but only if you intentionally want to seed production.
-
-### Vercel Frontend Settings
-
-Create a Vercel project:
-
-- Root Directory: `frontend`
-- Framework Preset: `Next.js`
-- Build Command: `npm run build`
-
-Vercel environment variable:
-
-```bash
-NEXT_PUBLIC_API_BASE_URL=https://applypilot-backend-nrtx.onrender.com/api
-```
-
-After Vercel deploys, update Render:
-
-```bash
-CORS_ORIGINS=http://localhost:3000,https://applypilot-web.vercel.app
-```
-
-Then redeploy the Render backend.
-
-### Production Smoke Tests
-
-Backend health:
-
-```bash
-curl https://applypilot-backend-nrtx.onrender.com/health
-```
-
-Demo login:
-
-```bash
-curl -X POST https://applypilot-backend-nrtx.onrender.com/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"demo@applypilot.dev","password":"password123"}'
-```
-
-Dashboard:
-
-```bash
-curl https://applypilot-backend-nrtx.onrender.com/api/dashboard/summary \
-  -H "Authorization: Bearer <TOKEN>"
-```
-
-Frontend:
-
-- Open `https://applypilot-web.vercel.app`
-- Login with `demo@applypilot.dev` / `password123`
-- Verify `/dashboard` loads seeded data
-- Verify `/jobs` loads demo jobs
-- Verify `/applications` loads the application pipeline
-- Verify `/jobs/new` can analyze a new pasted job
-
-## Production Notes
-
-- Render free instances may spin down after inactivity.
-- The app may take several seconds to respond on the first request.
-- JWTs are currently stored in `localStorage` for MVP simplicity.
-- For stronger production security, migrate auth to `httpOnly` secure cookies.
-- Do not commit real `.env` files.
-- Rotate database credentials if they were ever exposed outside the deployment environment.
-
-## Testing Commands
+## Testing
 
 Backend:
 
@@ -517,26 +369,47 @@ cd frontend
 npm run build
 ```
 
-Docker health check:
+Whitespace check:
 
 ```bash
-curl http://localhost:8000/health
+git diff --check
+```
+
+## Security Notes
+
+- Product routes are authenticated and scoped to the current user.
+- Job reanalysis only processes jobs owned by the authenticated user.
+- User-provided job and profile text is rendered as plain text.
+- JWTs are stored in `localStorage` for MVP simplicity.
+- For production hardening, migrate auth to `httpOnly`, `Secure`, `SameSite` cookies and add CSRF protection where appropriate.
+- Keep real `.env` files out of version control.
+
+## Deployment Notes
+
+Current hosted architecture:
+
+- Frontend: Vercel
+- Backend: Render Web Service
+- Database: Neon PostgreSQL
+
+Render backend start command:
+
+```bash
+alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+```
+
+Vercel frontend environment variable:
+
+```bash
+NEXT_PUBLIC_API_BASE_URL=https://applypilot-backend-nrtx.onrender.com/api
 ```
 
 ## Future Improvements
 
-- URL ingestion and scraping
-- Chrome extension
-- Local LLM or OpenAI provider
-- Resume tailoring suggestions
-- Recruiter message generator
-- Better skill taxonomy and weighting controls
-- Team or coach view
-- Email/calendar integrations
-- Deployment preview seed reset flow
-
-## Resume Bullet Examples
-
-- Built ApplyPilot, a full-stack job-fit decision engine that analyzes software engineering job descriptions, extracts hiring signals, evaluates new-grad suitability, and ranks job fit against a candidate resume.
-- Implemented FastAPI and PostgreSQL services for deterministic job parsing, sponsorship risk detection, resume-to-job matching, application tracking, and dashboard analytics.
-- Developed a Next.js dashboard that visualizes application status, match scores, missing skills, sponsorship signals, and actionable follow-up insights.
+- Background job queue for large reanalysis workloads.
+- URL-based job ingestion with HTML parsing.
+- Better skill ontology, aliases, and weighting controls.
+- Resume versioning and comparison across tailored variants.
+- Real-time updates after long-running analysis operations.
+- Stronger production auth with secure cookie storage.
+- Deployment preview seed reset flow.

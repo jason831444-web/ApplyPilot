@@ -227,12 +227,19 @@ class DeterministicRuleBasedProvider:
             concerns.append(f"Missing required skills: {', '.join(missing_required_skills[:8])}.")
         if missing_preferred_skills:
             concerns.append(f"Missing preferred skills: {', '.join(missing_preferred_skills[:8])}.")
+        missing_technical_skills = self._dedupe_text(missing_required_skills + missing_preferred_skills)
+        if missing_technical_skills:
+            concerns.append(f"Missing technical skills detected: {', '.join(missing_technical_skills[:8])}.")
+        if new_grad_fit_label == "not_new_grad_friendly":
+            concerns.append("This role shows senior-level or high-experience signals that may not be new-grad friendly.")
         if new_grad_fit_label in {"weak_fit", "not_new_grad_friendly"}:
             concerns.append("Seniority or experience requirements may be above a new-grad level.")
         if new_grad_fit_label == "weak_fit":
             concerns.append("This role may not be well-aligned with typical new-grad expectations.")
         if negative_signals:
             labels = [str(signal.get("label", "")).replace("_", " ") for signal in negative_signals[:4]]
+            if self._has_seniority_or_ownership_signal(negative_signals):
+                concerns.append("The posting emphasizes seniority, ownership, or high-agency expectations.")
             concerns.append(f"Startup intensity or ownership signals may raise the bar for a new grad: {', '.join(labels)}.")
             concerns.append("Startup intensity and ownership expectations may raise the bar for this role.")
         if authorization_risk == "high":
@@ -244,6 +251,11 @@ class DeterministicRuleBasedProvider:
         if location_fit_score < 50:
             concerns.append("Location does not appear to match the profile targets.")
         return self._dedupe_text(concerns)
+
+    def _has_seniority_or_ownership_signal(self, signals: list[dict]) -> bool:
+        keywords = {"senior", "staff", "principal", "lead", "architect", "ownership", "cto", "all rounder"}
+        labels = " ".join(str(signal.get("label", "")).lower() for signal in signals)
+        return any(keyword in labels for keyword in keywords)
 
     def _dedupe_text(self, values: list[str]) -> list[str]:
         seen: set[str] = set()

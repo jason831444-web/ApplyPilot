@@ -20,6 +20,59 @@ def test_inline_preferred_skills_are_not_required() -> None:
     assert set(preferred_skills) == {"Docker", "AWS", "FastAPI"}
 
 
+def test_benefits_healthcare_text_does_not_create_domain_signal() -> None:
+    description = (
+        "About the Role: Build backend services for customer workflows. "
+        "What We Offer: Top-notch healthcare coverage, medical, dental, vision."
+    )
+
+    result = DeterministicRuleBasedProvider().analyze(profile=make_profile(), job=make_job(description))
+    domain_signals = {item["label"] for item in result.evidence if item["type"] == "domain"}
+
+    assert "Healthcare" not in domain_signals
+
+
+def test_healthcare_product_context_creates_domain_signal() -> None:
+    description = "About the Role: Build healthcare workflows for clinics and providers."
+
+    result = DeterministicRuleBasedProvider().analyze(profile=make_profile(), job=make_job(description))
+    domain_signals = {item["label"] for item in result.evidence if item["type"] == "domain"}
+
+    assert "Healthcare" in domain_signals
+
+
+def test_backend_systems_posting_extracts_specific_backend_signals_without_node_false_positive() -> None:
+    description = (
+        "What You'll Do: Design scalable backend services using Go and C++. "
+        "Distributed systems, API design, observability, and production debugging."
+    )
+
+    result = DeterministicRuleBasedProvider().analyze(profile=make_profile(), job=make_job(description))
+    extracted = set(result.required_skills + result.preferred_skills)
+
+    assert {
+        "Go",
+        "C++",
+        "Distributed Systems",
+        "API Design",
+        "Observability",
+        "Production Debugging",
+        "Backend Systems",
+    } <= extracted
+    assert "Node.js" not in extracted
+
+
+def test_senior_high_ownership_role_generates_concerns() -> None:
+    description = "About the Role: Small, senior team. High ownership. Work directly with CTO."
+
+    result = DeterministicRuleBasedProvider().analyze(profile=make_profile(), job=make_job(description))
+    concern_text = " ".join(result.concerns).lower()
+
+    assert result.new_grad_fit_label in {"not_new_grad_friendly", "weak_fit"}
+    assert result.concerns
+    assert "senior" in concern_text or "ownership" in concern_text or "new-grad" in concern_text
+
+
 def test_range_experience_does_not_trigger_plus_year_signal() -> None:
     seniority_signals, _positive, _negative = extract_experience_signals(SAMPLE_DESCRIPTION)
     labels = [signal["label"] for signal in seniority_signals]
