@@ -236,6 +236,39 @@ def test_junior_python_role_ignores_senior_collaboration_context_and_extracts_da
     assert "Azure" not in result.missing_required_skills
 
 
+def test_exact_lmi_senior_collaboration_and_preferred_cloud_regression() -> None:
+    profile = make_profile()
+    profile.skills = ["Python", "AWS"]
+    profile.resume_text = "Junior Python programmer with AWS exposure."
+    job = SimpleNamespace(
+        company_name="Example Health",
+        job_title="Health Python Programmer - Junior",
+        location="Remote",
+        job_description=(
+            "Responsibilities:\n"
+            "Collaborate with senior developers and other team members to troubleshoot and debug code effectively.\n"
+            "Requirements:\n"
+            "2+ years professional Python experience.\n"
+            "Preferred Qualifications:\n"
+            "Knowledge of containerization tools such as Docker and cloud environments AWS, Azure."
+        ),
+    )
+
+    result = DeterministicRuleBasedProvider().analyze(profile=profile, job=job)
+    all_evidence_text = " ".join(str(item.get("text", "")).lower() for item in result.evidence)
+
+    assert result.new_grad_negative_signals == []
+    assert "collaborate with senior developers" not in all_evidence_text
+    assert "senior" not in all_evidence_text
+    assert "AWS" in result.preferred_skills
+    assert "Azure" in result.preferred_skills
+    assert "AWS" not in result.required_skills
+    assert "Azure" not in result.required_skills
+    assert "AWS" not in result.missing_required_skills
+    assert "Azure" not in result.missing_required_skills
+    assert "Azure" in result.missing_preferred_skills
+
+
 def test_senior_collaboration_context_is_not_negative_or_ownership_concern() -> None:
     description = "Collaborate with senior developers and other team members. Requirements: Python."
 

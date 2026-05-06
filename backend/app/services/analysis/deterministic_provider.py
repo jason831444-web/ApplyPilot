@@ -11,6 +11,7 @@ from app.services.analysis.extraction import (
     extract_skills_by_requirement,
     section_kind,
     split_sections,
+    suppress_senior_collaboration_context,
     unique_preserve,
 )
 from app.services.analysis.provider import JobAnalysisResult
@@ -33,12 +34,13 @@ class DeterministicRuleBasedProvider:
 
     def analyze(self, profile: Profile, job: Job) -> JobAnalysisResult:
         description = job.job_description or ""
-        required_skills, preferred_skills, skill_evidence = extract_skills_by_requirement(description)
-        alternative_skill_groups = extract_alternative_skill_groups(description)
-        has_clean_skill_sections = self._has_clean_skill_sections(description)
-        analysis_text = f"{job.job_title or ''}\n{description}"
+        analysis_description = suppress_senior_collaboration_context(description)
+        required_skills, preferred_skills, skill_evidence = extract_skills_by_requirement(analysis_description)
+        alternative_skill_groups = extract_alternative_skill_groups(analysis_description)
+        has_clean_skill_sections = self._has_clean_skill_sections(analysis_description)
+        analysis_text = f"{job.job_title or ''}\n{analysis_description}"
         seniority_signals, positive_signals, negative_signals = extract_experience_signals(analysis_text)
-        authorization_risk, authorization_evidence = extract_authorization(description)
+        authorization_risk, authorization_evidence = extract_authorization(analysis_description)
         context_labels = {item["label"] for item in skill_evidence if item.get("type") == "domain"}
         new_grad_fit_label, new_grad_fit_score = score_new_grad_fit(
             positive_signals=positive_signals,
@@ -140,7 +142,7 @@ class DeterministicRuleBasedProvider:
             parsed_title=job.job_title,
             parsed_company=job.company_name,
             parsed_locations=[job.location] if job.location else [],
-            employment_type=detect_employment_type(description),
+            employment_type=detect_employment_type(analysis_description),
             seniority_signals=seniority_signals,
             required_skills=required_skills,
             preferred_skills=preferred_skills,

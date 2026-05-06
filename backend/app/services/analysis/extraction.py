@@ -235,6 +235,7 @@ def suppress_senior_collaboration_context(text: str) -> str:
         r"\bcollaborat(?:e|ing)\s+with\s+senior\s+(?:developers|engineers|team members)(?:\s+and\s+other\s+team members)?",
         r"\bwork(?:ing)?\s+with\s+senior\s+(?:developers|engineers|team members)(?:\s+and\s+other\s+team members)?",
         r"\bsenior\s+(?:developers|engineers)\s+and\s+other\s+team members",
+        r"\bsenior\s+(?:developers|engineers)",
         r"\bsenior\s+team members",
         r"\blearn\s+from\s+senior\s+(?:developers|engineers)",
     ]

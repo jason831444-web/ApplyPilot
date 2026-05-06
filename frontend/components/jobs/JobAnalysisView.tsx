@@ -53,9 +53,16 @@ function CollapsibleSection({
   );
 }
 
+function nonDomainSkills(values: string[], domainSignals: string[]): string[] {
+  const domainSet = new Set(domainSignals);
+  return values.filter((value) => !domainSet.has(value));
+}
+
 export function JobAnalysisView({ analysis }: { analysis: JobAnalysis }) {
   const technicalSkills = analysis.technical_skills ?? [...analysis.required_skills, ...analysis.preferred_skills];
   const domainSignals = analysis.domain_signals ?? [];
+  const missingRequiredTechnicalSkills = nonDomainSkills(analysis.missing_required_skills ?? [], domainSignals);
+  const missingPreferredTechnicalSkills = nonDomainSkills(analysis.missing_preferred_skills ?? [], domainSignals);
   const concerns = [...analysis.concerns];
   if (analysis.skill_extraction_confidence === "low" && concerns.length === 0) {
     const confidenceConcern = "Only limited structured technical requirements were detected, so match confidence is lower.";
@@ -134,8 +141,8 @@ export function JobAnalysisView({ analysis }: { analysis: JobAnalysis }) {
         </div>
         <div className="mt-5">
           <MissingSkills
-            required={analysis.missing_technical_skills ?? analysis.missing_required_skills}
-            preferred={analysis.missing_preferred_technical_skills ?? analysis.missing_preferred_skills}
+            required={missingRequiredTechnicalSkills}
+            preferred={missingPreferredTechnicalSkills}
             skillGapNote={analysis.skill_gap_note}
             technicalSkillCount={technicalSkills.length}
             hasDomainSignals={domainSignals.length > 0}
