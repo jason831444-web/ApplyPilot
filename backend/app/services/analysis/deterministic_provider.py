@@ -108,7 +108,7 @@ class DeterministicRuleBasedProvider:
             technical_skill_count=technical_skill_count,
             location_fit_score=location_fit_score,
             new_grad_fit_label=new_grad_fit_label,
-            matched_skills=[skill for skill in all_job_skills if skill not in missing_required_skills + missing_preferred_skills],
+            matched_skills=self._matched_profile_skills(all_job_skills, profile_text),
         )
         concerns = self._concerns(
             authorization_risk=authorization_risk,
@@ -236,16 +236,17 @@ class DeterministicRuleBasedProvider:
         context_labels: set[str],
     ) -> list[str]:
         concerns: list[str] = []
+        sparse_concern = "Only limited structured technical requirements were detected, so match confidence is lower."
         if not has_required_skills:
-            concerns.append("No explicit required skills were detected, so the skill score is based on limited evidence.")
+            concerns.append(sparse_concern)
         if not has_preferred_skills and not has_clean_skill_sections:
-            concerns.append("No explicit preferred skills were detected in a clean preferred-skills section.")
+            concerns.append(sparse_concern)
         if technical_skill_count <= 2:
-            concerns.append("Only limited technical skill evidence was detected, so match confidence is lower.")
+            concerns.append(sparse_concern)
         if technical_skill_count <= 1:
-            concerns.append("Skill matching confidence is limited due to sparse or unstructured technical requirements.")
+            concerns.append(sparse_concern)
         if not has_clean_skill_sections and technical_skill_count <= 2:
-            concerns.append("This posting is unstructured, so the score should be interpreted cautiously.")
+            concerns.append(sparse_concern)
         missing_technical_skills = self._dedupe_text(missing_required_skills + missing_preferred_skills)
         if missing_technical_skills:
             concerns.append(f"Missing technical skills detected: {', '.join(missing_technical_skills[:8])}.")
@@ -292,6 +293,7 @@ class DeterministicRuleBasedProvider:
         normalized_groups = [
             ("missing technical skills", "missing technical skills detected"),
             ("authorization unclear", "work authorization requirements are unclear"),
+            ("sparse technical evidence", "limited structured technical requirements"),
             ("ownership intensity", "ownership expectations may raise the bar"),
             ("staffing placement", "staffing, training, or client-placement"),
             ("gig platform", "platform-based or gig-like"),
@@ -343,6 +345,9 @@ class DeterministicRuleBasedProvider:
 
     def _profile_matches_skill(self, skill: str, profile_text: str) -> bool:
         return any(re.search(pattern, profile_text, re.IGNORECASE) for pattern in skill_match_patterns(skill))
+
+    def _matched_profile_skills(self, skills: list[str], profile_text: str) -> list[str]:
+        return [skill for skill in skills if self._profile_matches_skill(skill, profile_text)]
 
     def _rescore(self, skills: list[str], missing_skills: list[str]) -> int:
         if not skills:

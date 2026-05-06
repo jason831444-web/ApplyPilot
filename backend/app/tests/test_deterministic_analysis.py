@@ -161,8 +161,31 @@ def test_data_annotation_style_alternative_language_list_and_platform_signals() 
     assert "C++" not in result.missing_required_skills
     assert "Go" not in result.missing_required_skills
     assert "Java" not in result.missing_required_skills
+    strengths_text = " ".join(result.strengths)
+    assert "Python" in strengths_text
+    assert "React" in strengths_text
+    assert "C++" not in strengths_text
+    assert "Go" not in strengths_text
     assert "Nontraditional Work" in domain_signals
     assert any("platform-based or gig-like" in concern for concern in result.concerns)
+
+
+def test_alternative_group_unmatched_options_are_not_matched_strengths_or_required_missing() -> None:
+    profile = make_profile()
+    profile.resume_text = f"{profile.resume_text} JavaScript TypeScript Java."
+    profile.skills = [*profile.skills, "JavaScript", "TypeScript", "Java"]
+    description = "Requirements: proficiency in at least one of JavaScript, TypeScript, Python, C++, React, Go, Java."
+
+    result = DeterministicRuleBasedProvider().analyze(profile=profile, job=make_job(description))
+    strengths_text = " ".join(result.strengths)
+
+    assert "C++" not in result.missing_required_skills
+    assert "Go" not in result.missing_required_skills
+    assert "C++" not in strengths_text
+    assert "Go" not in strengths_text
+    assert "JavaScript" in strengths_text
+    assert "TypeScript" in strengths_text
+    assert "Java" in strengths_text
 
 
 def test_junior_python_role_ignores_senior_collaboration_context_and_extracts_data_skills() -> None:
@@ -205,6 +228,33 @@ def test_junior_python_role_ignores_senior_collaboration_context_and_extracts_da
     } <= extracted
     assert "AWS" in result.preferred_skills
     assert "Azure" in result.preferred_skills
+    assert "AWS" not in result.missing_required_skills
+    assert "Azure" not in result.missing_required_skills
+
+
+def test_senior_collaboration_context_is_not_negative_or_ownership_concern() -> None:
+    description = "Collaborate with senior developers and other team members. Requirements: Python."
+
+    result = DeterministicRuleBasedProvider().analyze(profile=make_profile(), job=make_job(description))
+    negative_labels = {str(signal.get("label", "")) for signal in result.new_grad_negative_signals}
+    concern_text = " ".join(result.concerns).lower()
+
+    assert "senior" not in negative_labels
+    assert "senior team" not in negative_labels
+    assert "ownership" not in concern_text
+
+
+def test_preferred_cloud_skills_are_not_required_missing() -> None:
+    description = "Requirements: Python. Preferred Qualifications: AWS, Azure."
+
+    result = DeterministicRuleBasedProvider().analyze(profile=make_profile(), job=make_job(description))
+
+    assert "AWS" in result.preferred_skills
+    assert "Azure" in result.preferred_skills
+    assert "AWS" not in result.required_skills
+    assert "Azure" not in result.required_skills
+    assert "AWS" not in result.missing_required_skills
+    assert "Azure" not in result.missing_required_skills
 
 
 def test_forward_deployed_role_avoids_leading_venture_false_positive_and_extracts_context() -> None:
@@ -267,6 +317,8 @@ def test_concern_deduplication_prefers_concise_unique_messages() -> None:
             "Missing technical skills detected: Python.",
             "No clear sponsorship or work authorization evidence was found.",
             "Work authorization requirements are unclear from the job posting.",
+            "Only limited structured technical requirements were detected, so match confidence is lower.",
+            "Only limited structured technical requirements were detected, so match confidence is lower.",
             "Startup intensity and ownership expectations may raise the bar for this role: high ownership.",
             "Startup intensity and ownership expectations may raise the bar for this role: high ownership.",
         ]
@@ -274,6 +326,7 @@ def test_concern_deduplication_prefers_concise_unique_messages() -> None:
 
     assert "Missing technical skills detected: Python." in concerns
     assert "Work authorization requirements are unclear from the job posting." in concerns
+    assert len([concern for concern in concerns if "limited structured technical requirements" in concern]) == 1
     assert len([concern for concern in concerns if "ownership expectations" in concern]) == 1
     assert not any(concern.startswith("Missing required skills") for concern in concerns)
     assert not any(concern.startswith("No clear sponsorship") for concern in concerns)
@@ -329,7 +382,7 @@ def test_empty_skill_lists_use_neutral_scores_and_no_fake_skill_strengths() -> N
     assert result.preferred_skill_score == 50
     assert "Strong coverage of required skills." not in result.strengths
     assert "Good overlap with preferred skills." not in result.strengths
-    assert any("No explicit required skills were detected" in concern for concern in result.concerns)
+    assert any("limited structured technical requirements" in concern for concern in result.concerns)
     assert any("matching confidence is lower" in strength for strength in result.strengths)
 
 
@@ -463,8 +516,7 @@ def test_sparse_technical_startup_posting_caps_match_scores() -> None:
     assert result.new_grad_fit_label == "weak_fit"
     assert result.authorization_risk == "unknown"
     assert "Strong coverage of required skills." not in result.strengths
-    assert any("limited technical skill evidence" in concern for concern in result.concerns)
-    assert any("unstructured" in concern for concern in result.concerns)
+    assert any("limited structured technical requirements" in concern for concern in result.concerns)
     assert any("typical new-grad expectations" in concern for concern in result.concerns)
     assert any("Startup intensity and ownership expectations" in concern for concern in result.concerns)
     assert any("Work authorization requirements are unclear" in concern for concern in result.concerns)

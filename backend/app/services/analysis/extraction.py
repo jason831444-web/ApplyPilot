@@ -236,8 +236,8 @@ def should_skip_experience_signal(label: str, text: str, match: re.Match[str]) -
 
     if label in {"senior", "senior team"}:
         collaboration_patterns = [
-            r"collaborat(?:e|ing)\s+with\s+senior\s+(?:developers|engineers|team members)",
-            r"work(?:ing)?\s+with\s+senior\s+(?:developers|engineers|team members)",
+            r"collaborat(?:e|ing)\s+with\s+senior\s+(?:developers|engineers|team members)(?:\s+and\s+other\s+team members)?",
+            r"work(?:ing)?\s+with\s+senior\s+(?:developers|engineers|team members)(?:\s+and\s+other\s+team members)?",
             r"learn\s+from\s+senior\s+(?:developers|engineers)",
             r"senior\s+team members",
         ]

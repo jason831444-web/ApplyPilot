@@ -57,8 +57,8 @@ export function JobAnalysisView({ analysis }: { analysis: JobAnalysis }) {
   const technicalSkills = analysis.technical_skills ?? [...analysis.required_skills, ...analysis.preferred_skills];
   const domainSignals = analysis.domain_signals ?? [];
   const concerns = [...analysis.concerns];
-  if (analysis.skill_extraction_confidence === "low") {
-    const confidenceConcern = "Skill matching confidence is limited because the posting does not list clean technical requirements.";
+  if (analysis.skill_extraction_confidence === "low" && concerns.length === 0) {
+    const confidenceConcern = "Only limited structured technical requirements were detected, so match confidence is lower.";
     if (!concerns.includes(confidenceConcern)) {
       concerns.unshift(confidenceConcern);
     }
