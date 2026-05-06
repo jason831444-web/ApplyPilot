@@ -46,6 +46,7 @@ SECTION_HEADING_TERMS = [
     "our stack",
     "preferred",
     "preferred qualifications",
+    "qualifications",
     "recruiting process",
     "required",
     "required qualifications",
@@ -53,11 +54,14 @@ SECTION_HEADING_TERMS = [
     "responsibilities",
     "target salary range",
     "tech stack",
+    "technical foundation",
+    "the role",
     "tools for the job",
     "what we offer",
     "what you need",
     "what you'll do",
     "what you will do",
+    "who you are",
 ]
 
 SECTION_HEADING_ALTERNATION = "|".join(re.escape(term) for term in sorted(SECTION_HEADING_TERMS, key=len, reverse=True))
@@ -175,7 +179,11 @@ def extract_skills_by_requirement(text: str) -> tuple[list[str], list[str], list
         elif kind in {"general", "role"}:
             paragraph_hits = re.split(r"(?<=[.!?])\s+|\n+", body)
             for paragraph in paragraph_hits:
-                if re.search(r"\b(require|required|qualification|must have|need|experience with)\b", paragraph, re.IGNORECASE):
+                if re.search(
+                    r"\b(require|required|qualification|must have|need|experience with|strong programming fundamentals|technical foundation)\b",
+                    paragraph,
+                    re.IGNORECASE,
+                ):
                     required.extend(skill for skill in find_skills(paragraph) if skill not in DOMAIN_SIGNAL_LABELS)
 
         for skill in skills:
@@ -305,6 +313,9 @@ def should_skip_experience_signal(label: str, text: str, match: re.Match[str]) -
 
     if label == "lead":
         return match.group(0).lower().startswith("leading ")
+
+    if label == "architect":
+        return bool(re.search(r"\btechnical architect behind customer success\b", context))
 
     return False
 

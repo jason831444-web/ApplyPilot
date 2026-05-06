@@ -570,6 +570,72 @@ def test_staffing_training_role_caps_sparse_generic_score_and_ignores_generic_pe
     assert any("staffing, training, or client-placement" in concern for concern in result.concerns)
 
 
+def test_probook_style_fde_extracts_technical_foundation_and_authorization_without_architect_false_positive() -> None:
+    description = """
+The Role
+
+You will be the technical architect behind customer success, working with customer stakeholders on implementation/configuration.
+Exceptional new grads encouraged to apply.
+
+Technical Foundation
+
+Strong programming fundamentals (Python, SQL, APIs, data structures).
+
+Requirements
+
+BS/BA in Computer Science or a related field.
+1-3 years in technical roles.
+NYC-based and in-office.
+Authorized to work in the United States.
+"""
+
+    result = DeterministicRuleBasedProvider().analyze(profile=make_profile(), job=make_job(description))
+    extracted = set(result.required_skills + result.preferred_skills)
+    positive_labels = {str(signal.get("label", "")) for signal in result.new_grad_positive_signals}
+    negative_labels = {str(signal.get("label", "")) for signal in result.new_grad_negative_signals}
+    authorization_text = " ".join(str(item.get("text", "")).lower() for item in result.authorization_evidence)
+
+    assert {"Python", "SQL", "Data Structures"} <= extracted
+    assert "API Design" in extracted or "REST API" in extracted
+    assert "Customer-Facing Engineering" in extracted
+    assert "new grad" in positive_labels
+    assert "architect" not in negative_labels
+    assert result.authorization_risk != "unknown"
+    assert "authorized to work in the united states" in authorization_text
+
+
+def test_task_impetus_style_staffing_training_signals_survive_structured_sections() -> None:
+    profile = make_profile()
+    profile.skills = [*profile.skills, "Java"]
+    profile.resume_text = f"{profile.resume_text} Java applications."
+    description = """
+Requirements
+
+Java Developer role for OPT/CPT candidates.
+
+Pre-job Training
+
+Assignments & Case Studies during training.
+Mock sessions before interviews.
+Multiple interview rounds with different clients.
+
+Client Project
+
+H1B Sponsorship will be provided once they join client's project.
+Build generic applications with good performance and support client project delivery.
+"""
+
+    result = DeterministicRuleBasedProvider().analyze(profile=profile, job=make_job(description))
+    extracted = set(result.required_skills + result.preferred_skills)
+    domain_signals = {item["label"] for item in result.evidence if item["type"] == "domain"}
+
+    assert "Staffing/Training Placement" in domain_signals
+    assert extracted == {"Java"}
+    assert result.overall_score <= 58
+    assert result.analysis_confidence <= 0.52
+    assert any("staffing, training, or client-placement" in concern for concern in result.concerns)
+
+
 def test_concern_deduplication_prefers_concise_unique_messages() -> None:
     provider = DeterministicRuleBasedProvider()
 

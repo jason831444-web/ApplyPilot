@@ -43,10 +43,12 @@ SKILL_PATTERNS: dict[str, list[str]] = {
     "GCP": [r"\bgcp\b", r"\bgoogle cloud\b"],
     "Git": [r"\bgit\b", r"\bgithub\b", r"\bgitlab\b"],
     "CI/CD": [r"\bci/cd\b", r"\bcontinuous integration\b", r"\bcontinuous delivery\b"],
-    "REST API": [r"\brest(?:ful)? api(?:s)?\b", r"\brest\b"],
+    "REST API": [r"\brest(?:ful)? api(?:s)?\b", r"\bapis?\b", r"\brest\b"],
     "API Design": [r"\bapi design\b", r"\bdesign(?:ing)? apis?\b", r"\bapi architecture\b"],
     "GraphQL": [r"\bgraphql\b"],
     "Linux": [r"\blinux\b", r"\bunix\b"],
+    "Data Structures": [r"\bdata structures?\b"],
+    "Software Engineering Fundamentals": [r"\bprogramming fundamentals\b", r"\btechnical foundation\b"],
     "PySpark": [r"\bpyspark\b"],
     "Pandas": [r"\bpandas\b"],
     "NumPy": [r"\bnumpy\b"],
@@ -90,7 +92,14 @@ SKILL_PATTERNS: dict[str, list[str]] = {
     "Event-driven Systems": [r"\bevent[- ]driven systems?\b", r"\bevent[- ]driven architecture\b", r"\bevent streams?\b"],
     "Async Processing": [r"\basync processing\b", r"\basynchronous processing\b", r"\bbackground jobs?\b", r"\bjob queues?\b"],
     "Forward Deployed Engineering": [r"\bforward deployed engineer(?:ing)?\b", r"\bforward-deployed engineer(?:ing)?\b"],
-    "Customer-Facing Engineering": [r"\bcustomer[- ]facing engineering\b", r"\bcustomer[- ]facing engineer\b", r"\bwork directly with customers\b"],
+    "Customer-Facing Engineering": [
+        r"\bcustomer[- ]facing engineering\b",
+        r"\bcustomer[- ]facing engineer\b",
+        r"\bwork directly with customers\b",
+        r"\bcustomer stakeholders?\b",
+        r"\bcustomer success\b",
+        r"\bimplementation/configuration\b",
+    ],
     "Quantitative Modeling": [r"\bquantitative modeling\b", r"\bquant models?\b", r"\bfinancial modeling\b"],
     "Forecasting": [r"\bforecasting\b", r"\bforecasts?\b"],
     "Optimization": [r"\boptimization\b", r"\boptimisation\b"],
@@ -128,7 +137,10 @@ SKILL_PATTERNS: dict[str, list[str]] = {
         r"\bcase studies\b.{0,40}\btraining\b",
         r"\bmock sessions?\b",
         r"\bmultiple interview rounds?\b.{0,80}\bclients?\b",
+        r"\bdifferent clients?\b",
+        r"\bclient'?s project\b",
         r"\bclient project\b",
+        r"\bsponsorship\b.{0,80}\bclient'?s project\b",
         r"\bsponsorship\b.{0,80}\bclient project\b",
         r"\bplacement\b.{0,40}\btraining\b",
     ],
@@ -192,9 +204,12 @@ ROLE_SECTION_PATTERNS = [
     r"what you'll do",
     r"what you will do",
     r"responsibilities",
+    r"technical foundation",
+    r"the role",
     r"our stack",
     r"tools for the job",
     r"tech stack",
+    r"who you are",
 ]
 
 
@@ -208,6 +223,7 @@ class SignalRule:
 
 EXPERIENCE_RULES = [
     SignalRule("new grad", r"\bnew grad(?:uate)?s?\b", "positive", 3),
+    SignalRule("exceptional new grads encouraged", r"\bexceptional new grad(?:uate)?s?\b.{0,40}\bencouraged to apply\b", "positive", 3),
     SignalRule("entry-level", r"\bentry[- ]level\b", "positive", 3),
     SignalRule("junior", r"\bjunior\b", "positive", 2),
     SignalRule("early career", r"\bearly career\b", "positive", 2),
@@ -248,6 +264,7 @@ AUTHORIZATION_POSITIVE_PATTERNS = [
     r"\bsponsor(?:s|ship)?\b.{0,40}\b(h-?1b|visa|opt|cpt)\b",
     r"\b(h-?1b|visa|opt|cpt)\b.{0,40}\bsponsor",
     r"\bvisa sponsorship is available\b",
+    r"\bauthorized to work in (?:the )?(?:united states|u\.?s\.?|us)\b",
 ]
 
 AUTHORIZATION_HIGH_PATTERNS = [
