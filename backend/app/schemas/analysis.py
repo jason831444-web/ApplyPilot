@@ -98,6 +98,11 @@ class JobAnalysisRead(BaseModel):
 
     @computed_field
     @property
+    def keywords_to_consider(self) -> list[str]:
+        return self.missing_preferred_technical_skills
+
+    @computed_field
+    @property
     def missing_domain_signals(self) -> list[str]:
         return []
 

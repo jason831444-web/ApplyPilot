@@ -123,6 +123,7 @@ export type JobAnalysis = {
   missing_preferred_skills: string[];
   missing_technical_skills: string[];
   missing_preferred_technical_skills: string[];
+  keywords_to_consider: string[];
   missing_domain_signals: string[];
   skill_extraction_confidence: "high" | "medium" | "low";
   skill_gap_note: string | null;

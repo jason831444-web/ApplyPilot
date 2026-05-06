@@ -62,7 +62,10 @@ export function JobAnalysisView({ analysis }: { analysis: JobAnalysis }) {
   const technicalSkills = analysis.technical_skills ?? [...analysis.required_skills, ...analysis.preferred_skills];
   const domainSignals = analysis.domain_signals ?? [];
   const missingRequiredTechnicalSkills = nonDomainSkills(analysis.missing_required_skills ?? [], domainSignals);
-  const missingPreferredTechnicalSkills = nonDomainSkills(analysis.missing_preferred_skills ?? [], domainSignals);
+  const missingPreferredTechnicalSkills = nonDomainSkills(
+    analysis.keywords_to_consider ?? analysis.missing_preferred_skills ?? [],
+    domainSignals,
+  );
   const concerns = [...analysis.concerns];
   if (analysis.skill_extraction_confidence === "low" && concerns.length === 0) {
     const confidenceConcern = "Only limited structured technical requirements were detected, so match confidence is lower.";

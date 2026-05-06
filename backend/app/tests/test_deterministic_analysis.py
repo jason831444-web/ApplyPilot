@@ -352,6 +352,105 @@ def test_schema_missing_technical_skills_excludes_preferred_only_gaps() -> None:
 
     assert result.missing_technical_skills == []
     assert result.missing_preferred_technical_skills == ["Azure"]
+    assert result.keywords_to_consider == ["Azure"]
+
+
+def test_exact_preferred_cloud_regression_keeps_aws_azure_out_of_required_missing() -> None:
+    profile = SimpleNamespace(
+        resume_text="Python SQL Git Docker",
+        skills=["Python", "SQL", "Git", "Docker"],
+        projects=[],
+        experience_summary="",
+        target_roles=[],
+        target_locations=[],
+        work_authorization_notes="",
+    )
+    description = """
+    MINIMUM QUALIFICATIONS:
+    Python, SQL, Git.
+
+    PREFERRED QUALIFICATIONS:
+    Knowledge of Docker and cloud environments AWS, Azure, or other providers.
+    """
+
+    result = DeterministicRuleBasedProvider().analyze(profile=profile, job=make_job(description))
+    now = datetime.now(timezone.utc)
+    analysis = SimpleNamespace(
+        **{
+            **result.__dict__,
+            "id": 1,
+            "job_id": 2,
+            "user_id": 3,
+            "created_at": now,
+            "updated_at": now,
+        }
+    )
+    read = JobAnalysisRead.model_validate(analysis)
+
+    assert {"Python", "SQL", "Git"} <= set(result.required_skills)
+    assert {"Docker", "AWS", "Azure"} <= set(result.preferred_skills)
+    assert "AWS" not in result.missing_required_skills
+    assert "Azure" not in result.missing_required_skills
+    assert "AWS" not in read.missing_technical_skills
+    assert "Azure" not in read.missing_technical_skills
+    assert read.missing_required_skills == []
+    assert {"AWS", "Azure"} <= set(read.missing_preferred_technical_skills)
+    assert {"AWS", "Azure"} <= set(read.keywords_to_consider)
+
+
+def test_required_cloud_regression_keeps_aws_azure_as_required_missing() -> None:
+    profile = SimpleNamespace(
+        resume_text="Python SQL",
+        skills=["Python", "SQL"],
+        projects=[],
+        experience_summary="",
+        target_roles=[],
+        target_locations=[],
+        work_authorization_notes="",
+    )
+    description = """
+    MINIMUM QUALIFICATIONS:
+    Python, SQL, AWS, Azure.
+    """
+
+    result = DeterministicRuleBasedProvider().analyze(profile=profile, job=make_job(description))
+    now = datetime.now(timezone.utc)
+    analysis = SimpleNamespace(
+        **{
+            **result.__dict__,
+            "id": 1,
+            "job_id": 2,
+            "user_id": 3,
+            "created_at": now,
+            "updated_at": now,
+        }
+    )
+    read = JobAnalysisRead.model_validate(analysis)
+
+    assert {"AWS", "Azure"} <= set(result.required_skills)
+    assert {"AWS", "Azure"} <= set(result.missing_required_skills)
+    assert {"AWS", "Azure"} <= set(read.missing_technical_skills)
+    assert read.missing_preferred_technical_skills == []
+
+
+def test_unstructured_body_keeps_confidence_aware_missing_behavior() -> None:
+    profile = SimpleNamespace(
+        resume_text="Python SQL",
+        skills=["Python", "SQL"],
+        projects=[],
+        experience_summary="",
+        target_roles=[],
+        target_locations=[],
+        work_authorization_notes="",
+    )
+    description = "Build data tools using Python, SQL, and AWS while collaborating with product teams."
+
+    result = DeterministicRuleBasedProvider().analyze(profile=profile, job=make_job(description))
+
+    assert {"Python", "SQL", "AWS"} <= set(result.required_skills)
+    assert result.missing_required_skills == ["AWS"]
+    assert result.required_skill_score <= 88
+    assert any("matching confidence is lower" in strength for strength in result.strengths)
 
 
 def test_forward_deployed_role_avoids_leading_venture_false_positive_and_extracts_context() -> None:
